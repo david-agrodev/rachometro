@@ -9,34 +9,92 @@
 
     body {
       font-family: Arial, sans-serif;
-      background: #0b1020;
-      color: #f5f5f5;
+      background: var(--bg-primary);
+      color: var(--text-primary);
       min-height: 100vh;
       display: flex;
       justify-content: center;
       align-items: flex-start;
       padding: 10px;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    /* Tema Escuro (padrão) */
+    body {
+      --bg-primary: #0b1020;
+      --bg-secondary: #161b30;
+      --bg-card: #1e2438;
+      --text-primary: #f5f5f5;
+      --text-secondary: #cfd8dc;
+      --accent: #00e676;
+      --accent-hover: #00c853;
+      --warning: #ffca28;
+      --danger: #ff5252;
+      --danger-hover: #e53935;
+      --blue: #2979ff;
+      --blue-hover: #1565c0;
+    }
+
+    /* Tema Claro */
+    body.light-theme {
+      --bg-primary: #f5f5f5;
+      --bg-secondary: #ffffff;
+      --bg-card: #fafafa;
+      --text-primary: #212121;
+      --text-secondary: #616161;
+      --accent: #00c853;
+      --accent-hover: #00a845;
+      --warning: #ff8f00;
+      --danger: #d32f2f;
+      --danger-hover: #b71c1c;
+      --blue: #1976d2;
+      --blue-hover: #1565c0;
     }
 
     .container {
-      background: #161b30;
+      background: var(--bg-secondary);
       width: 100%;
       max-width: 900px;
       border-radius: 10px;
       padding: 16px;
-      box-shadow: 0 0 20px rgba(0,0,0,0.5);
+      box-shadow: 0 0 20px rgba(0,0,0,0.3);
+    }
+
+    .theme-toggle {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+    }
+
+    .theme-btn {
+      padding: 8px 12px;
+      border-radius: 20px;
+      border: none;
+      background: var(--accent);
+      color: var(--bg-primary);
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 0.85rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      transition: all 0.2s;
+    }
+
+    .theme-btn:hover {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
     }
 
     h1 {
       text-align: center;
       margin-bottom: 10px;
-      color: #00e676;
+      color: var(--accent);
       font-size: 1.5rem;
     }
 
     .section-title {
       font-size: 0.9rem;
-      color: #cfd8dc;
+      color: var(--text-secondary);
       margin-bottom: 4px;
       text-transform: uppercase;
       letter-spacing: 1px;
@@ -46,7 +104,7 @@
       text-align: center;
       font-size: 1.1rem;
       margin-bottom: 16px;
-      color: #ffca28;
+      color: var(--warning);
     }
 
     .mode-switch {
@@ -55,22 +113,24 @@
       margin-bottom: 10px;
       justify-content: center;
       flex-wrap: wrap;
+      align-items: center;
     }
 
     .mode-btn {
       padding: 6px 10px;
       border-radius: 20px;
-      border: 1px solid #263238;
-      background: #1c2331;
-      color: #cfd8dc;
+      border: 1px solid var(--text-secondary);
+      background: var(--bg-card);
+      color: var(--text-secondary);
       cursor: pointer;
       font-size: 0.85rem;
+      transition: all 0.2s;
     }
 
     .mode-btn.active {
-      background: #00e676;
-      color: #000;
-      border-color: #00e676;
+      background: var(--accent);
+      color: var(--bg-primary);
+      border-color: var(--accent);
       font-weight: bold;
     }
 
@@ -100,32 +160,46 @@
       cursor: pointer;
       font-weight: bold;
       font-size: 0.9rem;
-      background: #00e676;
-      color: #000;
-      transition: background 0.2s;
+      background: var(--accent);
+      color: var(--bg-primary);
+      transition: all 0.2s;
       min-width: 90px;
     }
 
     button:hover {
-      background: #00c853;
+      background: var(--accent-hover);
+      transform: translateY(-1px);
     }
 
     .btn-secondary {
-      background: #2979ff;
+      background: var(--blue);
       color: #fff;
     }
 
     .btn-secondary:hover {
-      background: #1565c0;
+      background: var(--blue-hover);
     }
 
     .btn-danger {
-      background: #ff5252;
+      background: var(--danger);
       color: #fff;
     }
 
     .btn-danger:hover {
-      background: #e53935;
+      background: var(--danger-hover);
+    }
+
+    .btn-small {
+      min-width: 50px;
+      padding: 4px 8px;
+      font-size: 0.8rem;
+    }
+
+    .extra-time-btns {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      margin-top: 8px;
     }
 
     .scoreboard {
@@ -138,7 +212,7 @@
     .team-card {
       flex: 1;
       min-width: 160px;
-      background: #1e2438;
+      background: var(--bg-card);
       border-radius: 8px;
       padding: 10px 12px;
       text-align: center;
@@ -148,7 +222,27 @@
       font-size: 1rem;
       font-weight: bold;
       margin-bottom: 6px;
-      color: #ffca28;
+      color: var(--warning);
+      cursor: pointer;
+      transition: all 0.2s;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .team-name:hover {
+      background: var(--bg-primary);
+    }
+
+    .team-name input {
+      font-size: 1rem;
+      font-weight: bold;
+      background: var(--bg-primary);
+      color: var(--warning);
+      border: 2px solid var(--accent);
+      border-radius: 4px;
+      padding: 4px 8px;
+      text-align: center;
+      width: 100%;
     }
 
     .score {
@@ -172,17 +266,78 @@
     .footer {
       margin-top: 14px;
       font-size: 0.75rem;
-      color: #b0bec5;
+      color: var(--text-secondary);
       text-align: center;
     }
 
     .alert-fim {
       margin-top: 4px;
       font-size: 0.9rem;
-      color: #ffca28;
+      color: var(--warning);
       font-weight: bold;
       text-align: center;
       min-height: 1.2em;
+    }
+
+    /* Modal de confirmação */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 2000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--bg-secondary);
+      padding: 24px;
+      border-radius: 12px;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal h3 {
+      margin-bottom: 16px;
+      color: var(--text-primary);
+      font-size: 1.2rem;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .modal-buttons button {
+      flex: 1;
+    }
+
+    @keyframes fimPisca {
+      0% { opacity: 1; }
+      50% { opacity: 0.2; }
+      100% { opacity: 1; }
+    }
+
+    .fim-card {
+      padding: 18px 0;
+      font-size: 1.5rem;
+      font-weight: bold;
+      background: var(--danger);
+      color: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 16px rgba(0, 0, 0, 0.6);
+      margin: 10px 0;
+      animation: fimPisca 1s steps(2, start) infinite;
     }
 
     @media (max-width: 600px) {
@@ -193,11 +348,15 @@
   </style>
 </head>
 <body>
+  <div class="theme-toggle">
+    <button class="theme-btn" id="themeToggle">☀️ Tema Claro</button>
+  </div>
+
   <div class="container">
     <div style="width:100%;display:flex;justify-content:center;margin-bottom:18px;">
-      <img src="goleio1.png" alt="Logo Goleio" style="max-width:220px;width:100%;height:auto;border-radius:12px;box-shadow:0 2px 16px #0006;">
+      <img src="goleio1.png" alt="Logo Goleio" style="max-width:220px;width:100%;height:auto;border-radius:12px;box-shadow:0 2px 16px rgba(0,0,0,0.4);">
     </div>
-    <button onclick="window.location.href='index.html'" style="width:100%;margin-bottom:16px;padding:12px 0;font-size:1.1rem;background:#2979ff;color:#fff;border:none;border-radius:8px;box-shadow:0 2px 8px #0004;cursor:pointer;font-weight:bold;">Voltar para Sorteio de Times</button>
+    <button onclick="window.location.href='index.html'" style="width:100%;margin-bottom:16px;padding:12px 0;font-size:1.1rem;background:var(--blue);color:#fff;border:none;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;font-weight:bold;">Voltar para Sorteio de Times</button>
     <h1>Goleio – Cronômetro & Placar</h1>
 
     <!-- Relógio em tempo real -->
@@ -210,8 +369,8 @@
     <div class="mode-switch">
       <button id="btnModoChrono" class="mode-btn active">Cronômetro</button>
       <button id="btnModoTimer" class="mode-btn">Timer</button>
-      <input id="inputMinutosTimer" type="number" min="1" max="99" value="7" style="width:70px;margin-left:8px;padding:6px 4px;border-radius:6px;border:1px solid #263238;background:#1c2331;color:#eceff1;font-size:1rem;" title="Minutos do Timer" />
-      <span style="color:#cfd8dc;font-size:0.95rem;margin-left:4px;">min</span>
+      <input id="inputMinutosTimer" type="number" min="1" max="99" value="7" style="width:70px;margin-left:8px;padding:6px 4px;border-radius:6px;border:1px solid var(--text-secondary);background:var(--bg-card);color:var(--text-primary);font-size:1rem;" title="Minutos do Timer" />
+      <span style="color:var(--text-secondary);font-size:0.95rem;margin-left:4px;">min</span>
     </div>
 
     <!-- Área Cronômetro / Timer -->
@@ -223,6 +382,11 @@
         <button id="btnPause" class="btn-secondary">Pausar</button>
         <button id="btnReset" class="btn-danger">Zerar</button>
       </div>
+      <div class="extra-time-btns">
+        <button id="btnAdd1" class="btn-small btn-secondary">+1 min</button>
+        <button id="btnAdd3" class="btn-small btn-secondary">+3 min</button>
+        <button id="btnAdd5" class="btn-small btn-secondary">+5 min</button>
+      </div>
       <div id="alertFim" class="alert-fim"></div>
     </div>
 
@@ -231,7 +395,7 @@
       <p class="section-title">Placar</p>
       <div class="scoreboard">
         <div class="team-card">
-          <div class="team-name">
+          <div class="team-name" id="team1Name" onclick="editTeamName(1)">
             Time 1
           </div>
           <div id="score1" class="score">0</div>
@@ -242,7 +406,7 @@
         </div>
 
         <div class="team-card">
-          <div class="team-name">
+          <div class="team-name" id="team2Name" onclick="editTeamName(2)">
             Time 2
           </div>
           <div id="score2" class="score">0</div>
@@ -257,11 +421,68 @@
     <p class="footer">
       Escolha entre Cronômetro ou Timer.
       O Timer avisa na tela e com som quando o tempo acabar.
+      Clique nos nomes dos times para renomeá-los.
     </p>
   </div>
 
+  <!-- Modal de confirmação -->
+  <div id="confirmModal" class="modal-overlay">
+    <div class="modal">
+      <h3>Confirmar</h3>
+      <p id="confirmMessage">Tem certeza que deseja zerar o placar?</p>
+      <div class="modal-buttons">
+        <button id="confirmCancel" class="btn-secondary">Cancelar</button>
+        <button id="confirmOk" class="btn-danger">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
   <script>
-    // Relógio digital [web:112][web:118]
+    // ========== TEMA ==========
+    const themeToggle = document.getElementById('themeToggle');
+    const body = document.body;
+
+    function loadTheme() {
+      const savedTheme = localStorage.getItem('theme') || 'dark';
+      if (savedTheme === 'light') {
+        body.classList.add('light-theme');
+        themeToggle.textContent = '🌙 Tema Escuro';
+      } else {
+        body.classList.remove('light-theme');
+        themeToggle.textContent = '☀️ Tema Claro';
+      }
+    }
+
+    themeToggle.addEventListener('click', () => {
+      body.classList.toggle('light-theme');
+      const isLight = body.classList.contains('light-theme');
+      localStorage.setItem('theme', isLight ? 'light' : 'dark');
+      themeToggle.textContent = isLight ? '🌙 Tema Escuro' : '☀️ Tema Claro';
+    });
+
+    loadTheme();
+
+    // ========== NOTIFICAÇÕES ==========
+    function requestNotificationPermission() {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
+
+    function showNotification(title, body) {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(title, {
+          body: body,
+          icon: 'icon-512.png',
+          badge: 'goleio1.png'
+        });
+      }
+    }
+
+    // Solicitar permissão ao carregar
+    requestNotificationPermission();
+
+    // ========== RELÓGIO ==========
     function atualizarRelogio() {
       const clockEl = document.getElementById("clock");
       const agora = new Date();
@@ -273,7 +494,7 @@
     setInterval(atualizarRelogio, 1000);
     atualizarRelogio();
 
-    // Elementos comuns
+    // ========== ELEMENTOS ==========
     const chronoEl = document.getElementById("chronoTime");
     const labelModoEl = document.getElementById("labelModo");
     const alertFimEl = document.getElementById("alertFim");
@@ -283,8 +504,11 @@
     const btnModoChrono = document.getElementById("btnModoChrono");
     const btnModoTimer = document.getElementById("btnModoTimer");
     const inputMinutosTimer = document.getElementById("inputMinutosTimer");
+    const btnAdd1 = document.getElementById("btnAdd1");
+    const btnAdd3 = document.getElementById("btnAdd3");
+    const btnAdd5 = document.getElementById("btnAdd5");
 
-    // Áudio simples de beep (Web Audio API)
+    // ========== ÁUDIO ==========
     function tocarBeep(vezes = 5, intervalo = 350) {
       let count = 0;
       function beep() {
@@ -305,13 +529,13 @@
       beep();
     }
 
-    // Estados gerais
-    let modo = "chrono"; // "chrono" ou "timer"
+    // ========== ESTADOS ==========
+    let modo = localStorage.getItem('modo') || 'chrono';
     let intervalo = null;
     let rodando = false;
-    let elapsedMs = 0;       // usado no cronômetro
+    let elapsedMs = parseInt(localStorage.getItem('elapsedMs')) || 0;
     let timerTotalMs = parseInt(inputMinutosTimer.value, 10) * 60 * 1000;
-    let timerRestanteMs = timerTotalMs;
+    let timerRestanteMs = parseInt(localStorage.getItem('timerRestanteMs')) || timerTotalMs;
 
     function formatarMs(ms) {
       ms = Math.max(0, ms);
@@ -329,6 +553,12 @@
       } else {
         chronoEl.textContent = formatarMs(timerRestanteMs);
       }
+    }
+
+    function salvarEstado() {
+      localStorage.setItem('modo', modo);
+      localStorage.setItem('elapsedMs', elapsedMs);
+      localStorage.setItem('timerRestanteMs', timerRestanteMs);
     }
 
     function limparIntervalo() {
@@ -350,20 +580,20 @@
         if (modo === "chrono") {
           elapsedMs += delta;
           renderTempo();
+          salvarEstado();
         } else {
           timerRestanteMs -= delta;
           if (timerRestanteMs <= 0) {
             timerRestanteMs = 0;
             renderTempo();
             limparIntervalo();
-            alertFimEl.innerHTML = '<div id="fimCard" style="padding:18px 0;font-size:1.5rem;font-weight:bold;background:#ff5252;color:#fff;border-radius:10px;box-shadow:0 2px 16px #000a;margin:10px 0;animation:fimPisca 1s steps(2, start) infinite;">FIM DO TEMPO!</div>';
-            tocarBeep(5, 350); // aviso sonoro 5x
-            // Animação para o card piscando
-            const stylePisca = document.createElement('style');
-            stylePisca.innerHTML = `@keyframes fimPisca { 0%{opacity:1;} 50%{opacity:0.2;} 100%{opacity:1;} }`;
-            document.head.appendChild(stylePisca);
+            alertFimEl.innerHTML = '<div class="fim-card">FIM DO TEMPO!</div>';
+            tocarBeep(5, 350);
+            showNotification('Goleio - Timer', 'O tempo acabou! 🔔');
+            salvarEstado();
           } else {
             renderTempo();
+            salvarEstado();
           }
         }
       }, 100);
@@ -374,27 +604,40 @@
     }
 
     function reset() {
-      limparIntervalo();
-      alertFimEl.textContent = "";
-      if (modo === "chrono") {
-        elapsedMs = 0;
-      } else {
-        timerTotalMs = parseInt(inputMinutosTimer.value, 10) * 60 * 1000;
-        timerRestanteMs = timerTotalMs;
-      }
-      renderTempo();
+      showConfirmDialog('Tem certeza que deseja zerar o cronômetro?', () => {
+        limparIntervalo();
+        alertFimEl.textContent = "";
+        if (modo === "chrono") {
+          elapsedMs = 0;
+        } else {
+          timerTotalMs = parseInt(inputMinutosTimer.value, 10) * 60 * 1000;
+          timerRestanteMs = timerTotalMs;
+        }
+        renderTempo();
+        salvarEstado();
+      });
     }
 
-    // Alternar modos
+    function addExtraTime(minutes) {
+      if (modo === "timer") {
+        timerRestanteMs += minutes * 60 * 1000;
+        timerTotalMs += minutes * 60 * 1000;
+        alertFimEl.textContent = "";
+        renderTempo();
+        salvarEstado();
+      }
+    }
+
     function setModoChrono() {
       modo = "chrono";
       btnModoChrono.classList.add("active");
       btnModoTimer.classList.remove("active");
       labelModoEl.textContent = "Cronômetro do racha";
-      elapsedMs = 0;
+      elapsedMs = parseInt(localStorage.getItem('elapsedMs')) || 0;
       limparIntervalo();
       alertFimEl.textContent = "";
       renderTempo();
+      salvarEstado();
     }
 
     function setModoTimer() {
@@ -403,10 +646,11 @@
       btnModoChrono.classList.remove("active");
       labelModoEl.textContent = `Timer – ${inputMinutosTimer.value} minutos`;
       timerTotalMs = parseInt(inputMinutosTimer.value, 10) * 60 * 1000;
-      timerRestanteMs = timerTotalMs;
+      timerRestanteMs = parseInt(localStorage.getItem('timerRestanteMs')) || timerTotalMs;
       limparIntervalo();
       alertFimEl.textContent = "";
       renderTempo();
+      salvarEstado();
     }
 
     inputMinutosTimer.addEventListener("change", () => {
@@ -415,34 +659,85 @@
         timerRestanteMs = timerTotalMs;
         labelModoEl.textContent = `Timer – ${inputMinutosTimer.value} minutos`;
         renderTempo();
+        salvarEstado();
       }
     });
 
     btnModoChrono.addEventListener("click", setModoChrono);
     btnModoTimer.addEventListener("click", setModoTimer);
-
     btnStart.addEventListener("click", start);
     btnPause.addEventListener("click", pause);
     btnReset.addEventListener("click", reset);
+    btnAdd1.addEventListener("click", () => addExtraTime(1));
+    btnAdd3.addEventListener("click", () => addExtraTime(3));
+    btnAdd5.addEventListener("click", () => addExtraTime(5));
 
-    // Inicializa com cronômetro
-    renderTempo();
+    // Inicializa com modo salvo
+    if (modo === 'timer') {
+      setModoTimer();
+    } else {
+      setModoChrono();
+    }
 
-    // Placar [web:113][web:116]
+    // ========== PLACAR ==========
     const score1El = document.getElementById("score1");
     const score2El = document.getElementById("score2");
+    const team1NameEl = document.getElementById("team1Name");
+    const team2NameEl = document.getElementById("team2Name");
     const t1Mais = document.getElementById("t1Mais");
     const t1Menos = document.getElementById("t1Menos");
     const t2Mais = document.getElementById("t2Mais");
     const t2Menos = document.getElementById("t2Menos");
 
-    let score1 = 0;
-    let score2 = 0;
+    let score1 = parseInt(localStorage.getItem('score1')) || 0;
+    let score2 = parseInt(localStorage.getItem('score2')) || 0;
+    let team1Name = localStorage.getItem('team1Name') || 'Time 1';
+    let team2Name = localStorage.getItem('team2Name') || 'Time 2';
 
     function renderScores() {
       score1El.textContent = score1;
       score2El.textContent = score2;
+      team1NameEl.textContent = team1Name;
+      team2NameEl.textContent = team2Name;
+      localStorage.setItem('score1', score1);
+      localStorage.setItem('score2', score2);
     }
+
+    function editTeamName(teamNumber) {
+      const nameEl = teamNumber === 1 ? team1NameEl : team2NameEl;
+      const currentName = teamNumber === 1 ? team1Name : team2Name;
+      
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = currentName;
+      input.style.cssText = nameEl.style.cssText;
+      
+      nameEl.replaceWith(input);
+      input.focus();
+      input.select();
+
+      function saveName() {
+        const newName = input.value.trim() || currentName;
+        if (teamNumber === 1) {
+          team1Name = newName;
+          localStorage.setItem('team1Name', team1Name);
+          input.replaceWith(team1NameEl);
+        } else {
+          team2Name = newName;
+          localStorage.setItem('team2Name', team2Name);
+          input.replaceWith(team2NameEl);
+        }
+        renderScores();
+      }
+
+      input.addEventListener('blur', saveName);
+      input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') saveName();
+      });
+    }
+
+    // Tornar editTeamName global
+    window.editTeamName = editTeamName;
 
     t1Mais.addEventListener("click", () => {
       score1++;
@@ -450,8 +745,10 @@
     });
 
     t1Menos.addEventListener("click", () => {
-      if (score1 > 0) score1--;
-      renderScores();
+      if (score1 > 0) {
+        score1--;
+        renderScores();
+      }
     });
 
     t2Mais.addEventListener("click", () => {
@@ -460,11 +757,42 @@
     });
 
     t2Menos.addEventListener("click", () => {
-      if (score2 > 0) score2--;
-      renderScores();
+      if (score2 > 0) {
+        score2--;
+        renderScores();
+      }
     });
 
     renderScores();
+
+    // ========== MODAL DE CONFIRMAÇÃO ==========
+    const confirmModal = document.getElementById('confirmModal');
+    const confirmMessage = document.getElementById('confirmMessage');
+    const confirmOk = document.getElementById('confirmOk');
+    const confirmCancel = document.getElementById('confirmCancel');
+    let confirmCallback = null;
+
+    function showConfirmDialog(message, callback) {
+      confirmMessage.textContent = message;
+      confirmCallback = callback;
+      confirmModal.classList.add('show');
+    }
+
+    function hideConfirmDialog() {
+      confirmModal.classList.remove('show');
+      confirmCallback = null;
+    }
+
+    confirmOk.addEventListener('click', () => {
+      if (confirmCallback) confirmCallback();
+      hideConfirmDialog();
+    });
+
+    confirmCancel.addEventListener('click', hideConfirmDialog);
+
+    confirmModal.addEventListener('click', (e) => {
+      if (e.target === confirmModal) hideConfirmDialog();
+    });
   </script>
 </body>
 </html>

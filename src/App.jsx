@@ -1,0 +1,1322 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Check,
+  Clipboard,
+  ClipboardCheck,
+  ClipboardList,
+  Info,
+  List,
+  Pause,
+  Play,
+  RotateCcw,
+  Shield,
+  Shuffle,
+  Sparkles,
+  Tag,
+  Timer,
+  Trash2,
+  Trophy,
+  UserPlus,
+  Star
+} from "lucide-react";
+
+const APP_NAME = "RachôMetro";
+const logoUrl = "/rachometro-logo.png";
+
+const CAB_GOLS = ["GOLEIRO", "GOLEIROS", "GOL", "GOLEIRA", "GOLEIRAO"];
+const CAB_JOGS = [
+  "ATLETAS",
+  "ATLETA",
+  "JOGADORES",
+  "JOGADOR",
+  "LINHA",
+  "ATLETAS DE ALTO NIVEL",
+  "ATLETAS DE ALTO NÍVEL"
+];
+const CAB_ESPERA = ["LISTA DE ESPERA", "ESPERA", "RESERVA", "SUPLENTE"];
+const CAB_SEPARAR = ["SEPARAR", "SEPARAR CRAQUES", "NAO JUNTAR", "EVITAR JUNTOS"];
+const MODALIDADES = [
+  { value: "futsal", label: "FUTSAL", jogadores: 5 },
+  { value: "society", label: "SOCIETY", jogadores: 6 },
+  { value: "campo", label: "CAMPO", jogadores: 11 },
+  { value: "volei", label: "VÔLEI", jogadores: 6 }
+];
+
+const MODELO_LISTA = `✅ LISTA DOS CONFIRMADOS
+
+GOLEIROS
+1.
+2.
+
+ATLETAS
+1.
+2.
+3.
+4.
+5.`;
+
+function routeFromHash() {
+  return window.location.hash === "#/placar" ? "placar" : "sorteio";
+}
+
+function navigateTo(route) {
+  window.location.hash = route === "placar" ? "#/placar" : "#/";
+}
+
+function normalizarCabecalho(texto) {
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w\s]/g, "")
+    .trim()
+    .toUpperCase();
+}
+
+function contemCabecalho(linhaNormalizada, listaChaves) {
+  return listaChaves.some(chave => linhaNormalizada.includes(normalizarCabecalho(chave)));
+}
+
+function limparLinha(linha) {
+  return linha
+    .replace(/[✅⚽🧤🏆🔥⭐🌟🔹▪️▫️■□▣▢]/g, "")
+    .replace(/[\uFE0F\u20E3]/g, "")
+    .replace(/^[\s\d.)\]-]+/, "")
+    .replace(/^[^\p{L}\p{N}]+/u, "")
+    .replace(/^\d+\s*[-–—.)]\s*/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizarNomeJogador(nome) {
+  return nome
+    .replace(/\s*\(GOL\)/i, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function embaralhar(array) {
+  const copia = [...array];
+  let currentIndex = copia.length;
+
+  while (currentIndex !== 0) {
+    const randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex--;
+    [copia[currentIndex], copia[randomIndex]] = [copia[randomIndex], copia[currentIndex]];
+  }
+
+  return copia;
+}
+
+function calcularQuantidadeTimes(quantidadeGoleiros, quantidadeJogadores, porTime) {
+  const total = quantidadeGoleiros + quantidadeJogadores;
+  let numTimes = Math.ceil(total / porTime);
+
+  if (quantidadeGoleiros > 0 && quantidadeGoleiros < numTimes && porTime > 1) {
+    numTimes = Math.max(numTimes, Math.ceil(quantidadeJogadores / (porTime - 1)));
+  }
+
+  return Math.max(1, numTimes);
+}
+
+function aplicarRestricoes(times, grupos) {
+  const avisos = [];
+  const temAlguemDoGrupo = (grupoNorm, time) =>
+    time.some(p => grupoNorm.has(normalizarNomeJogador(p)));
+  const ehGoleiro = jogador => /\(GOL\)$/i.test(jogador);
+
+  grupos.forEach(grupo => {
+    const grupoNorm = new Set(grupo.map(normalizarNomeJogador));
+
+    for (let t = 0; t < times.length; t++) {
+      const indices = [];
+
+      for (let j = 0; j < times[t].length; j++) {
+        if (grupoNorm.has(normalizarNomeJogador(times[t][j]))) indices.push(j);
+      }
+
+      if (indices.length <= 1) continue;
+
+      for (let k = indices.length - 1; k >= 1; k--) {
+        const idx = indices[k];
+        const jogador = times[t][idx];
+        let destino = -1;
+        let indiceSubstituto = -1;
+        let menor = Infinity;
+
+        for (let tt = 0; tt < times.length; tt++) {
+          if (tt === t) continue;
+          if (temAlguemDoGrupo(grupoNorm, times[tt])) continue;
+          const substituto = times[tt].findIndex(p =>
+            !grupoNorm.has(normalizarNomeJogador(p)) && ehGoleiro(p) === ehGoleiro(jogador)
+          );
+
+          if (substituto !== -1 && times[tt].length < menor) {
+            menor = times[tt].length;
+            destino = tt;
+            indiceSubstituto = substituto;
+          }
+        }
+
+        if (destino === -1) {
+          avisos.push(`${grupo.join(" / ")}: não foi possível separar totalmente.`);
+        } else {
+          const substituto = times[destino][indiceSubstituto];
+          times[destino][indiceSubstituto] = jogador;
+          times[t][idx] = substituto;
+        }
+      }
+    }
+  });
+
+  return avisos;
+}
+
+function formatarMs(ms) {
+  const seguro = Math.max(0, ms);
+  const totalCent = Math.floor(seguro / 10);
+  const cent = String(totalCent % 100).padStart(2, "0");
+  const totalSeconds = Math.floor(seguro / 1000);
+  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  return `${minutes}:${seconds}:${cent}`;
+}
+
+function usePersistentNumber(key, initialValue) {
+  const [value, setValue] = useState(() => {
+    const saved = Number(localStorage.getItem(key));
+    return Number.isFinite(saved) ? saved : initialValue;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(key, String(value));
+  }, [key, value]);
+
+  return [value, setValue];
+}
+
+function App() {
+  const [route, setRoute] = useState(routeFromHash);
+  const [toast, setToast] = useState("");
+  const toastTimer = useRef(null);
+
+  useEffect(() => {
+    const onHashChange = () => setRoute(routeFromHash());
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  useEffect(() => {
+    if (import.meta.env.PROD && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/service-worker.js").catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!("caches" in window)) return undefined;
+
+    const cacheCurrentApp = () => {
+      const sameOriginResources = performance
+        .getEntriesByType("resource")
+        .map(entry => entry.name)
+        .filter(url => url.startsWith(window.location.origin))
+        .filter(url => /\.(js|css|png|jpg|jpeg|webp|svg|ico)$/i.test(url));
+
+      const coreUrls = ["/", "/index.html", "/manifest.json", "/icon-192.png", "/icon-512.png", "/rachometro-logo.png"];
+      caches
+        .open("rachometro-runtime-v2")
+        .then(cache => cache.addAll([...new Set([...coreUrls, ...sameOriginResources])]))
+        .catch(() => {});
+    };
+
+    window.addEventListener("load", cacheCurrentApp, { once: true });
+    return () => window.removeEventListener("load", cacheCurrentApp);
+  }, []);
+
+  function showToast(message) {
+    setToast(message);
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(""), 3000);
+  }
+
+  function goTo(nextRoute) {
+    setRoute(nextRoute);
+    navigateTo(nextRoute);
+  }
+
+  return (
+    <>
+      <div className={`toast ${toast ? "show" : ""}`}>{toast}</div>
+      {route === "placar" ? (
+        <ScorePage logoUrl={logoUrl} goTo={goTo} showToast={showToast} />
+      ) : (
+        <DrawPage logoUrl={logoUrl} goTo={goTo} showToast={showToast} />
+      )}
+    </>
+  );
+}
+
+function DrawPage({ logoUrl, goTo, showToast }) {
+  const [modalGuiaAberto, setModalGuiaAberto] = useState(false);
+  const [modalCraquesAberto, setModalCraquesAberto] = useState(false);
+  const [modalidade, setModalidade] = useState("futsal");
+  const [jogadoresPorTime, setJogadoresPorTime] = useState(5);
+  const [modoEntrada, setModoEntrada] = useState("lista");
+  const [textoBruto, setTextoBruto] = useState("");
+  const [manualNome, setManualNome] = useState("");
+  const [corrigeNome, setCorrigeNome] = useState("");
+  const [selectMoverNome, setSelectMoverNome] = useState("");
+  const [goleiros, setGoleiros] = useState([]);
+  const [jogadores, setJogadores] = useState([]);
+  const [paresRestritos, setParesRestritos] = useState([]);
+  const [selecaoGrupo, setSelecaoGrupo] = useState([]);
+  const [selecaoCraques, setSelecaoCraques] = useState([]);
+  const [secaoSepararAberta, setSecaoSepararAberta] = useState(false);
+  const [secaoCorrigirAberta, setSecaoCorrigirAberta] = useState(false);
+  const [times, setTimes] = useState([]);
+  const [avisos, setAvisos] = useState([]);
+  const [ultimoTextoCopiavel, setUltimoTextoCopiavel] = useState("");
+  const [sorteando, setSorteando] = useState(false);
+  const [craquesAplicados, setCraquesAplicados] = useState([]);
+  const suspenseTimer = useRef(null);
+  const resultadosRef = useRef(null);
+
+  const todosNomes = useMemo(() => [...goleiros, ...jogadores], [goleiros, jogadores]);
+  const temNomes = goleiros.length + jogadores.length > 0;
+
+  const previewLista = useMemo(() => {
+    const linhas = [];
+    if (goleiros.length) {
+      linhas.push("GOLEIROS", ...goleiros.map((nome, i) => `${i + 1}. ${nome}`));
+    }
+    if (jogadores.length) {
+      if (linhas.length) linhas.push("");
+      linhas.push("ATLETAS", ...jogadores.map((nome, i) => `${i + 1}. ${nome}`));
+    }
+    return linhas.join("\n");
+  }, [goleiros, jogadores]);
+
+  const maxCraques = useMemo(() => {
+    const porTime = Number(jogadoresPorTime);
+    if (!porTime || porTime <= 0) return jogadores.length;
+    return Math.min(jogadores.length, calcularQuantidadeTimes(goleiros.length, jogadores.length, porTime));
+  }, [goleiros.length, jogadores.length, jogadoresPorTime]);
+
+  useEffect(() => {
+    return () => window.clearTimeout(suspenseTimer.current);
+  }, []);
+
+  function processarLista() {
+    if (!textoBruto.trim()) {
+      showToast("Cole uma lista antes de processar.");
+      return;
+    }
+
+    const linhas = textoBruto.split("\n");
+    let secao = "none";
+    const novosGoleiros = [];
+    const novosJogadores = [];
+
+    for (const bruta of linhas) {
+      const linha = bruta.trim();
+      if (!linha) continue;
+
+      const upper = normalizarCabecalho(linha);
+      if (contemCabecalho(upper, CAB_GOLS)) {
+        secao = "goleiros";
+        continue;
+      }
+      if (contemCabecalho(upper, CAB_JOGS)) {
+        secao = "jogadores";
+        continue;
+      }
+      if (contemCabecalho(upper, CAB_ESPERA)) {
+        secao = "espera";
+        continue;
+      }
+      if (contemCabecalho(upper, CAB_SEPARAR)) {
+        secao = "separar";
+        continue;
+      }
+      if (secao === "espera" || secao === "separar" || secao === "none") continue;
+
+      const nomeLimpo = limparLinha(linha);
+      if (!nomeLimpo) continue;
+      if (secao === "goleiros") novosGoleiros.push(nomeLimpo);
+      if (secao === "jogadores") novosJogadores.push(nomeLimpo);
+    }
+
+    setGoleiros(novosGoleiros);
+    setJogadores(novosJogadores);
+    setParesRestritos([]);
+    setSelecaoGrupo([]);
+    setSelecaoCraques([]);
+    setCraquesAplicados([]);
+    setTimes([]);
+    setAvisos([]);
+    setUltimoTextoCopiavel("");
+    setModalCraquesAberto(true);
+  }
+
+  function finalizarCraques(aplicar) {
+    const craques = aplicar ? [...selecaoCraques] : [];
+    setParesRestritos(craques.length > 1 ? [craques] : []);
+    setCraquesAplicados(craques);
+    setModalCraquesAberto(false);
+    setSelecaoCraques([]);
+    showToast(craques.length ? "Craques marcados. Sorteando..." : "Sorteando sem separar craques...");
+    sortearTimes(craques.length > 1 ? [craques] : [], craques);
+  }
+
+  function sortearTimes(gruposForcados, craquesForcados = craquesAplicados) {
+    if (sorteando) return;
+    const gruposRestritos = Array.isArray(gruposForcados) ? gruposForcados : paresRestritos;
+
+    const porTime = Number(jogadoresPorTime);
+    if (!porTime || porTime <= 0) {
+      showToast("Informe jogadores por time.");
+      return;
+    }
+
+    if (goleiros.length + jogadores.length === 0) {
+      showToast("Adicione ou processe nomes antes de sortear.");
+      return;
+    }
+
+    setSorteando(true);
+    setTimes([]);
+    setAvisos([]);
+    setUltimoTextoCopiavel("");
+
+    suspenseTimer.current = window.setTimeout(() => {
+      executarSorteio(porTime, gruposRestritos, craquesForcados);
+      setSorteando(false);
+    }, 2300);
+  }
+
+  function executarSorteio(porTime, gruposRestritos = paresRestritos, craquesMarcados = craquesAplicados) {
+    let jogadoresSorteio = [...jogadores];
+    const goleirosSorteio = [...goleiros];
+    const numTimes = calcularQuantidadeTimes(goleirosSorteio.length, jogadoresSorteio.length, porTime);
+    const novosTimes = Array.from({ length: numTimes }, () => []);
+
+    if (goleirosSorteio.length > 0 && goleirosSorteio.length < numTimes && porTime > 1) {
+      for (let t = 0; t < numTimes; t++) {
+        novosTimes[t].push(`${goleirosSorteio[t % goleirosSorteio.length]} (GOL)`);
+      }
+    } else {
+      const goleirosTitulares = Math.min(goleirosSorteio.length, numTimes);
+      for (let t = 0; t < goleirosTitulares; t++) {
+        novosTimes[t].push(`${goleirosSorteio[t]} (GOL)`);
+      }
+      jogadoresSorteio.push(...goleirosSorteio.slice(numTimes).map(goleiro => `${goleiro} (GOL)`));
+    }
+
+    jogadoresSorteio = embaralhar(jogadoresSorteio);
+    let iJog = 0;
+    for (let t = 0; t < numTimes; t++) {
+      while (novosTimes[t].length < porTime && iJog < jogadoresSorteio.length) {
+        novosTimes[t].push(jogadoresSorteio[iJog]);
+        iJog++;
+      }
+    }
+
+    const novosAvisos = aplicarRestricoes(novosTimes, gruposRestritos);
+    const texto = montarTextoTimes(novosTimes, modalidade, novosAvisos, craquesMarcados);
+    setTimes(novosTimes);
+    setAvisos(novosAvisos);
+    setUltimoTextoCopiavel(texto);
+    showToast("Times revelados.");
+    window.setTimeout(() => {
+      resultadosRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }
+
+  function montarTextoTimes(timesMontados, modalidadeAtual, avisosRestricao, craquesMarcados = craquesAplicados) {
+    let texto = `*GOLEIO* (Sorteio)\nModalidade: ${modalidadeAtual.toUpperCase()}\n\n`;
+
+    timesMontados.forEach((time, index) => {
+      texto += `Time ${index + 1}\n`;
+      time.forEach(jogador => {
+        const craque = ehCraque(jogador, craquesMarcados);
+        texto += `${craque ? "⭐ " : "- "}${jogador}\n`;
+      });
+      texto += "\n";
+    });
+
+    if (avisosRestricao.length) {
+      texto += `Avisos:\n${avisosRestricao.map(aviso => `- ${aviso}`).join("\n")}\n`;
+    }
+
+    return texto.trim();
+  }
+
+  async function copiarTexto(texto, sucesso) {
+    try {
+      await navigator.clipboard.writeText(texto);
+      showToast(sucesso);
+    } catch {
+      showToast("Não foi possível copiar. Verifique as permissões do navegador.");
+    }
+  }
+
+  function adicionarManual(tipo) {
+    const nome = manualNome.trim();
+    if (!nome) {
+      showToast("Digite um nome para adicionar.");
+      return;
+    }
+
+    if (tipo === "goleiro") setGoleiros(prev => [...prev, nome]);
+    else setJogadores(prev => [...prev, nome]);
+
+    setManualNome("");
+    showToast(`${nome} adicionado.`);
+  }
+
+  function moverJogador(destino) {
+    const nome = (corrigeNome || selectMoverNome).trim();
+    if (!nome) {
+      showToast("Informe ou selecione o nome.");
+      return;
+    }
+
+    const nomeLower = nome.toLowerCase();
+    const idxGol = goleiros.findIndex(n => n.toLowerCase() === nomeLower);
+    const idxJog = jogadores.findIndex(n => n.toLowerCase() === nomeLower);
+
+    if (idxGol === -1 && idxJog === -1) {
+      showToast("Nome não encontrado.");
+      return;
+    }
+
+    let nomeMovido = nome;
+    const proximosGoleiros = [...goleiros];
+    const proximosJogadores = [...jogadores];
+
+    if (idxGol !== -1) nomeMovido = proximosGoleiros.splice(idxGol, 1)[0];
+    if (idxJog !== -1) nomeMovido = proximosJogadores.splice(idxJog, 1)[0];
+
+    if (destino === "goleiro") proximosGoleiros.push(nomeMovido);
+    else proximosJogadores.push(nomeMovido);
+
+    setGoleiros(proximosGoleiros);
+    setJogadores(proximosJogadores);
+    setCorrigeNome("");
+    setSelectMoverNome("");
+    showToast("Jogador movido.");
+  }
+
+  function toggleNomeGrupo(nome) {
+    setSelecaoGrupo(prev =>
+      prev.includes(nome) ? prev.filter(item => item !== nome) : [...prev, nome]
+    );
+  }
+
+  function criarGrupoSeparado() {
+    if (selecaoGrupo.length < 2) {
+      showToast("Selecione pelo menos 2 nomes.");
+      return;
+    }
+
+    const chave = selecaoGrupo.map(normalizarNomeJogador).sort().join("|");
+    const existe = paresRestritos.some(grupo => grupo.map(normalizarNomeJogador).sort().join("|") === chave);
+    if (existe) {
+      showToast("Esse grupo já existe.");
+      return;
+    }
+
+    setParesRestritos(prev => [...prev, [...selecaoGrupo]]);
+    setSelecaoGrupo([]);
+    showToast("Grupo adicionado para separar.");
+  }
+
+  function limparTudo() {
+    setTextoBruto("");
+    setManualNome("");
+    setCorrigeNome("");
+    setSelectMoverNome("");
+    setGoleiros([]);
+    setJogadores([]);
+    setParesRestritos([]);
+    setSelecaoGrupo([]);
+    setSelecaoCraques([]);
+    setCraquesAplicados([]);
+    setTimes([]);
+    setAvisos([]);
+    setUltimoTextoCopiavel("");
+    setSecaoSepararAberta(false);
+    setSecaoCorrigirAberta(false);
+  }
+
+  function ehCraque(jogador, listaCraques = craquesAplicados) {
+    const nomeNormalizado = normalizarNomeJogador(jogador);
+    return listaCraques.some(nome => normalizarNomeJogador(nome) === nomeNormalizado);
+  }
+
+  async function colarLista() {
+    try {
+      const clip = await navigator.clipboard.readText();
+      if (!clip) {
+        showToast("Área de transferência vazia.");
+        return;
+      }
+      setTextoBruto(clip);
+      showToast("Lista colada.");
+    } catch {
+      showToast("Não foi possível colar.");
+    }
+  }
+
+  function mudarModalidade(novaModalidade) {
+    const config = MODALIDADES.find(item => item.value === novaModalidade);
+    setModalidade(novaModalidade);
+    if (config) setJogadoresPorTime(config.jogadores);
+  }
+
+  return (
+    <div className="app-shell">
+      <header className="app-topbar">
+        <div className="brand-lockup">
+          <img className="brand-logo" src={logoUrl} alt={APP_NAME} />
+          <div>
+            <span className="app-kicker">{APP_NAME}</span>
+            <h1>Sorteio de Times</h1>
+          </div>
+        </div>
+        <button className="icon-action" type="button" onClick={() => goTo("placar")}>
+          <Timer size={18} />
+          <span>Placar</span>
+        </button>
+      </header>
+
+      <main className="app-main">
+        <section className="control-panel compact-panel">
+          <div className="section-head">
+            <span>Configuração</span>
+            <p className="status-pill">Goleiros: {goleiros.length} | Jogadores: {jogadores.length}</p>
+          </div>
+          <div className="form-grid">
+            <label>
+              Modalidade
+              <select value={modalidade} onChange={event => mudarModalidade(event.target.value)}>
+                {MODALIDADES.map(item => (
+                  <option value={item.value} key={item.value}>{item.label}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Por time
+              <input
+                type="number"
+                min="1"
+                value={jogadoresPorTime}
+                onChange={event => setJogadoresPorTime(event.target.value)}
+              />
+            </label>
+          </div>
+        </section>
+
+        <section className="control-panel">
+          <div className="mode-toggle">
+            <span>Entrada</span>
+            <div className="segmented">
+              <button className={modoEntrada === "lista" ? "active" : ""} type="button" onClick={() => setModoEntrada("lista")}>
+                Colar lista
+              </button>
+              <button className={modoEntrada === "manual" ? "active" : ""} type="button" onClick={() => setModoEntrada("manual")}>
+                Manual
+              </button>
+            </div>
+          </div>
+
+          {modoEntrada === "lista" ? (
+            <>
+              <label>
+                Lista do grupo
+                <div className="paste-wrapper">
+                  <textarea
+                    value={textoBruto}
+                    onChange={event => setTextoBruto(event.target.value)}
+                    placeholder={"Cole aqui a mensagem com:\nGOLEIROS\nATLETAS DE ALTO NÍVEL\nLISTA DE ESPERA"}
+                  />
+                  <button className="paste-btn" type="button" onClick={colarLista}>
+                    Colar
+                  </button>
+                </div>
+              </label>
+              <div className="primary-actions">
+                <button type="button" onClick={processarLista}>
+                  <Shuffle size={19} />
+                  Processar
+                </button>
+                <button className="btn-outline" type="button" onClick={() => copiarTexto(MODELO_LISTA, "Modelo copiado.")}>
+                  <ClipboardList size={18} />
+                  Modelo
+                </button>
+                <button className="btn-secondary" type="button" onClick={limparTudo}>
+                  <Trash2 size={18} />
+                  Limpar
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <label>
+                Jogador
+                <input
+                  value={manualNome}
+                  onChange={event => setManualNome(event.target.value)}
+                  placeholder="Nome do jogador"
+                />
+              </label>
+              <div className="compact-actions">
+                <button className="btn-outline" type="button" onClick={() => adicionarManual("jogador")}>
+                  <UserPlus size={18} />
+                  Linha
+                </button>
+                <button className="btn-secondary" type="button" onClick={() => adicionarManual("goleiro")}>
+                  <Shield size={18} />
+                  GOL
+                </button>
+              </div>
+              <div className="compact-actions utility-actions">
+                <button className="btn-outline" type="button" onClick={() => setSecaoSepararAberta(prev => !prev)}>
+                  Separar craques
+                </button>
+                <button className="btn-outline" type="button" onClick={() => setSecaoCorrigirAberta(prev => !prev)}>
+                  Mover função
+                </button>
+              </div>
+            </>
+          )}
+
+          {secaoSepararAberta && (
+            <div className="tool-box">
+              <label>Evitar que joguem juntos</label>
+              <NameGrid nomes={todosNomes} selecionados={selecaoGrupo} onToggle={toggleNomeGrupo} />
+              <div className="compact-actions">
+                <button type="button" onClick={criarGrupoSeparado}>Separar selecionados</button>
+                <button className="btn-outline" type="button" onClick={() => setSelecaoGrupo([])}>Limpar seleção</button>
+              </div>
+              <div className="pair-list">
+                {paresRestritos.length ? paresRestritos.map((grupo, index) => (
+                  <span className="pair-chip" key={grupo.join("-")}>
+                    {grupo.join(" / ")}
+                    <button type="button" onClick={() => setParesRestritos(prev => prev.filter((_, i) => i !== index))}>Remover</button>
+                  </span>
+                )) : <span className="hint">Nenhum grupo cadastrado.</span>}
+              </div>
+            </div>
+          )}
+
+          {secaoCorrigirAberta && (
+            <div className="tool-box">
+              <label>
+                Mover jogador
+                <select value={selectMoverNome} onChange={event => setSelectMoverNome(event.target.value)}>
+                  <option value="">Selecione</option>
+                  {todosNomes.map(nome => <option key={nome} value={nome}>{nome}</option>)}
+                </select>
+              </label>
+              <input value={corrigeNome} onChange={event => setCorrigeNome(event.target.value)} placeholder="Ou digite um nome" />
+              <div className="compact-actions">
+                <button className="btn-outline" type="button" onClick={() => moverJogador("goleiro")}>Para GOL</button>
+                <button className="btn-outline" type="button" onClick={() => moverJogador("jogador")}>Para Linha</button>
+              </div>
+            </div>
+          )}
+
+          {temNomes && (
+            <div className="primary-actions sort-actions">
+              <button type="button" onClick={sortearTimes} disabled={sorteando}>
+                <Sparkles size={19} />
+                {sorteando ? "Sorteando..." : "Sortear novamente"}
+              </button>
+              <button
+                className="btn-outline"
+                type="button"
+                onClick={() => ultimoTextoCopiavel ? copiarTexto(ultimoTextoCopiavel, "Times copiados.") : showToast("Sorteie os times primeiro.")}
+                disabled={!ultimoTextoCopiavel}
+              >
+                <Clipboard size={18} />
+                Copiar times
+              </button>
+            </div>
+          )}
+
+          {modoEntrada === "manual" && (
+            <label>
+              Prévia
+              <textarea className="textarea-ghost" readOnly value={previewLista} placeholder="Nenhum nome adicionado ainda." />
+            </label>
+          )}
+        </section>
+
+        <section className="results-panel" ref={resultadosRef}>
+          {avisos.map(aviso => <p className="warning-line" key={aviso}>{aviso}</p>)}
+          <div className="times-container">
+            {times.map((time, index) => (
+              <div className="time-card" key={`time-${index + 1}`}>
+                <h3>
+                  Time {index + 1}
+                  <span className="badge">{time.length}</span>
+                </h3>
+                <ul>
+                  {time.map(jogador => {
+                    const isGoleiro = jogador.toUpperCase().includes("(GOL)");
+                    const isCraque = ehCraque(jogador);
+                    return (
+                      <li className={`${isGoleiro ? "goleiro" : ""} ${isCraque ? "craque" : ""}`} key={`${index}-${jogador}`}>
+                        <span className="player-name">
+                          {isCraque && <Star className="craque-star" size={15} fill="currentColor" />}
+                          {jogador.replace(/\s*\(GOL\)/i, "")}
+                        </span>
+                        {isGoleiro && <span className="tag-gol">GOL</span>}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      <p className="footer-info">{APP_NAME}</p>
+
+      {modalGuiaAberto && (
+        <GuideModal onClose={() => setModalGuiaAberto(false)} onCopyModel={() => copiarTexto(MODELO_LISTA, "Modelo copiado.")} />
+      )}
+
+      {modalCraquesAberto && (
+        <CraquesModal
+          jogadores={jogadores}
+          maxCraques={maxCraques}
+          selecionados={selecaoCraques}
+          setSelecionados={setSelecaoCraques}
+          onSkip={() => finalizarCraques(false)}
+          onApply={() => finalizarCraques(true)}
+        />
+      )}
+
+      {sorteando && (
+        <DrawSuspenseOverlay totalNomes={goleiros.length + jogadores.length} totalGoleiros={goleiros.length} />
+      )}
+
+      <button className="floating-help" type="button" onClick={() => setModalGuiaAberto(true)} aria-label="Abrir guia rápido">
+        <Info size={19} />
+      </button>
+    </div>
+  );
+}
+
+function DrawSuspenseOverlay({ totalNomes, totalGoleiros }) {
+  return (
+    <div className="draw-suspense" role="status" aria-live="polite">
+      <div className="draw-suspense-card">
+        <div className="mystery-stage">
+          <div className="draw-orbit draw-orbit-one" />
+          <div className="draw-orbit draw-orbit-two" />
+          <JerseyIcon />
+          <div className="shuffle-card card-a">GOL</div>
+          <div className="shuffle-card card-b">10</div>
+          <div className="shuffle-card card-c">7</div>
+        </div>
+        <p className="draw-kicker">Mistério no ar</p>
+        <h2>Montando os times...</h2>
+        <div className="draw-meter">
+          <span />
+        </div>
+        <p className="draw-copy">
+          {totalNomes} nomes na lista, {totalGoleiros} goleiro{totalGoleiros === 1 ? "" : "s"} na disputa.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function JerseyIcon() {
+  return (
+    <svg className="jersey-icon" viewBox="0 0 120 120" aria-hidden="true">
+      <path className="jersey-shadow" d="M32 26 16 49l15 18 10-8v42c13 4 38 4 50 0V59l10 8 15-18-16-23-23-10H55L32 26Z" />
+      <path className="jersey-body" d="M33 25 18 48l14 17 10-8v42c13 4 36 4 48 0V57l10 8 14-17-15-23-22-9H55L33 25Z" />
+      <path className="jersey-trim" d="M47 30c8-4 28-4 36 0l-5 11c-7-3-20-3-27 0l-4-11Z" />
+      <path className="jersey-stripe left" d="M28 40 42 58v40" />
+      <path className="jersey-stripe right" d="M102 40 90 58v40" />
+      <text x="60" y="72" textAnchor="middle">8</text>
+    </svg>
+  );
+}
+
+function NameGrid({ nomes, selecionados, onToggle }) {
+  if (!nomes.length) return <span className="hint">Nenhum nome carregado.</span>;
+
+  return (
+    <div className="name-grid">
+      {nomes.map(nome => (
+        <button
+          className={selecionados.includes(nome) ? "name-chip selected" : "name-chip"}
+          type="button"
+          key={nome}
+          onClick={() => onToggle(nome)}
+        >
+          {nome}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function GuideModal({ onClose, onCopyModel }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={event => event.stopPropagation()}>
+        <div className="modal-head">
+          <div className="modal-chip"><Info size={16} /> Guia rápido</div>
+          <h2>Bem-vindo ao sorteio</h2>
+        </div>
+        <div className="modal-grid">
+          <Tip icon={<ClipboardCheck />} title="Passo a passo">Cole a lista, processe, sorteie e copie os times.</Tip>
+          <Tip icon={<Tag />} title="Cabeçalhos aceitos">GOLEIRO/GOL e ATLETAS/ATLETA/LINHA/JOGADOR.</Tip>
+          <Tip icon={<List />} title="Modelo pronto">Use o modelo para padronizar a lista do grupo.</Tip>
+          <Tip icon={<RotateCcw />} title="Goleiro por time">Se faltar goleiro, o app repete em rodízio.</Tip>
+        </div>
+        <div className="modal-actions">
+          <button className="btn-outline" type="button" onClick={onCopyModel}>Copiar modelo</button>
+          <button type="button" onClick={onClose}>Fechar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Tip({ icon, title, children }) {
+  return (
+    <div className="card-tip">
+      {icon}
+      <div>
+        <strong>{title}</strong>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function CraquesModal({ jogadores, maxCraques, selecionados, setSelecionados, onSkip, onApply }) {
+  function toggle(nome) {
+    setSelecionados(prev => {
+      if (prev.includes(nome)) return prev.filter(item => item !== nome);
+      if (prev.length >= maxCraques) return prev;
+      return [...prev, nome];
+    });
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onSkip}>
+      <div className="modal-box" onClick={event => event.stopPropagation()}>
+        <div className="modal-head">
+          <div className="modal-chip"><Trophy size={16} /> Equilíbrio</div>
+          <h2>Separar os craques</h2>
+        </div>
+        <p className="modal-copy">
+          Selecione até {maxCraques} jogador{maxCraques === 1 ? "" : "es"}. Cada selecionado fica em um time diferente.
+        </p>
+        <div className="name-grid modal-name-grid">
+          {jogadores.length ? jogadores.map(nome => {
+            const ativo = selecionados.includes(nome);
+            return (
+              <button
+                className={ativo ? "name-chip selected" : "name-chip"}
+                disabled={!ativo && selecionados.length >= maxCraques}
+                type="button"
+                key={nome}
+                onClick={() => toggle(nome)}
+              >
+                {ativo && <Star size={13} fill="currentColor" />}
+                {nome}
+              </button>
+            );
+          }) : <span className="hint">Nenhum jogador de linha encontrado.</span>}
+        </div>
+        <div className="modal-actions">
+          <button className="btn-outline" type="button" onClick={onSkip}>Sortear sem separar</button>
+          <button type="button" onClick={onApply}><Check size={18} /> Aplicar e sortear</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ScorePage({ logoUrl, goTo, showToast }) {
+  const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "dark");
+  const [clock, setClock] = useState("--:--:--");
+  const [now, setNow] = useState(Date.now());
+  const [mode, setMode] = useState(() => localStorage.getItem("modo") || "chrono");
+  const [running, setRunning] = useState(() => localStorage.getItem("timerRunning") === "true");
+  const [runStartedAt, setRunStartedAt] = usePersistentNumber("timerRunStartedAt", 0);
+  const [elapsedMs, setElapsedMs] = usePersistentNumber("elapsedMs", 0);
+  const [timerMinutes, setTimerMinutes] = useState(() => Number(localStorage.getItem("timerMinutes")) || 7);
+  const [timerRestanteMs, setTimerRestanteMs] = usePersistentNumber("timerRestanteMs", 7 * 60 * 1000);
+  const [alertFim, setAlertFim] = useState(false);
+  const [score1, setScore1] = usePersistentNumber("score1", 0);
+  const [score2, setScore2] = usePersistentNumber("score2", 0);
+  const [team1Name, setTeam1Name] = useState(() => localStorage.getItem("team1Name") || "Time 1");
+  const [team2Name, setTeam2Name] = useState(() => localStorage.getItem("team2Name") || "Time 2");
+  const [editingTeam, setEditingTeam] = useState(null);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const fimTimerNotificadoRef = useRef(false);
+
+  useEffect(() => {
+    document.body.classList.toggle("light-theme", theme === "light");
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
+    const tick = () => {
+      const agora = new Date();
+      const h = String(agora.getHours()).padStart(2, "0");
+      const m = String(agora.getMinutes()).padStart(2, "0");
+      const s = String(agora.getSeconds()).padStart(2, "0");
+      setClock(`${h}:${m}:${s}`);
+      setNow(agora.getTime());
+    };
+    tick();
+    const id = window.setInterval(tick, 250);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("modo", mode);
+  }, [mode]);
+
+  useEffect(() => {
+    localStorage.setItem("timerRunning", String(running));
+  }, [running]);
+
+  useEffect(() => {
+    localStorage.setItem("timerMinutes", String(timerMinutes));
+  }, [timerMinutes]);
+
+  useEffect(() => {
+    localStorage.setItem("team1Name", team1Name);
+  }, [team1Name]);
+
+  useEffect(() => {
+    localStorage.setItem("team2Name", team2Name);
+  }, [team2Name]);
+
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, []);
+
+  const tempoAtual = calcularTempoAtual(now);
+
+  useEffect(() => {
+    if (!running || mode !== "timer") {
+      fimTimerNotificadoRef.current = false;
+      return;
+    }
+
+    if (tempoAtual <= 0 && !fimTimerNotificadoRef.current) {
+      fimTimerNotificadoRef.current = true;
+      setRunning(false);
+      setRunStartedAt(0);
+      setTimerRestanteMs(0);
+      setAlertFim(true);
+      tocarBeep();
+      showNotification(`${APP_NAME} - Timer`, "O tempo acabou!");
+    }
+  }, [mode, running, tempoAtual, setRunStartedAt, setTimerRestanteMs]);
+
+  function calcularTempoAtual(baseNow = Date.now()) {
+    if (!running || !runStartedAt) {
+      return mode === "chrono" ? elapsedMs : timerRestanteMs;
+    }
+
+    const delta = Math.max(0, baseNow - runStartedAt);
+    if (mode === "chrono") return elapsedMs + delta;
+    return Math.max(0, timerRestanteMs - delta);
+  }
+
+  function pausarTempo() {
+    if (!running) return;
+    const atual = calcularTempoAtual();
+    if (mode === "chrono") setElapsedMs(atual);
+    else setTimerRestanteMs(atual);
+    setRunning(false);
+    setRunStartedAt(0);
+  }
+
+  function iniciarTempo() {
+    if (running) return;
+    setAlertFim(false);
+    fimTimerNotificadoRef.current = false;
+
+    if (mode === "timer" && timerRestanteMs <= 0) {
+      setTimerRestanteMs(Number(timerMinutes) * 60 * 1000);
+    }
+
+    setRunStartedAt(Date.now());
+    setRunning(true);
+  }
+
+  function setModoChrono() {
+    pausarTempo();
+    setMode("chrono");
+    setAlertFim(false);
+  }
+
+  function setModoTimer() {
+    pausarTempo();
+    setMode("timer");
+    setAlertFim(false);
+    if (timerRestanteMs <= 0) setTimerRestanteMs(Number(timerMinutes) * 60 * 1000);
+  }
+
+  function resetTempo() {
+    setRunning(false);
+    setRunStartedAt(0);
+    setAlertFim(false);
+    if (mode === "chrono") setElapsedMs(0);
+    else setTimerRestanteMs(Number(timerMinutes) * 60 * 1000);
+    setConfirmReset(false);
+  }
+
+  function mudarTimerMinutes(value) {
+    const minutes = Math.max(1, Number(value) || 1);
+    setTimerMinutes(minutes);
+    if (mode === "timer" && !running) setTimerRestanteMs(minutes * 60 * 1000);
+  }
+
+  function addExtraTime(minutes) {
+    if (mode !== "timer") return;
+    if (running) {
+      setTimerRestanteMs(calcularTempoAtual() + minutes * 60 * 1000);
+      setRunStartedAt(Date.now());
+    } else {
+      setTimerRestanteMs(prev => prev + minutes * 60 * 1000);
+    }
+    setAlertFim(false);
+  }
+
+  function resetPlacar() {
+    setScore1(0);
+    setScore2(0);
+    showToast("Placar zerado.");
+  }
+
+  return (
+    <div className="app-shell score-shell">
+      <header className="app-topbar">
+        <div className="brand-lockup">
+          <img className="brand-logo" src={logoUrl} alt={APP_NAME} />
+          <div>
+            <span className="app-kicker">{APP_NAME}</span>
+            <h1>Cronômetro & Placar</h1>
+          </div>
+        </div>
+        <button className="icon-action theme-action" type="button" onClick={() => setTheme(theme === "light" ? "dark" : "light")}>
+          {theme === "light" ? "Escuro" : "Claro"}
+        </button>
+      </header>
+
+      <div className="quick-nav">
+        <button className="btn-secondary score-nav-button" type="button" onClick={() => goTo("sorteio")}>
+          <Shuffle size={17} />
+          <span>Sorteio</span>
+        </button>
+        <div className="clock">{clock}</div>
+      </div>
+
+      <main className="match-layout">
+        <section className="match-panel timer-panel">
+          <div className="section-row">
+            <p className="section-title">{mode === "chrono" ? "Cronômetro do racha" : "Timer da partida"}</p>
+            <label className="timer-length">
+              <input
+                type="number"
+                min="1"
+                max="99"
+                value={timerMinutes}
+                onChange={event => mudarTimerMinutes(event.target.value)}
+              />
+              <span>min</span>
+            </label>
+          </div>
+
+          <div className="segmented">
+            <button className={mode === "chrono" ? "active" : ""} type="button" onClick={setModoChrono}>Cronômetro</button>
+            <button className={mode === "timer" ? "active" : ""} type="button" onClick={setModoTimer}>Timer</button>
+          </div>
+
+          <div className="chrono-time">{formatarMs(tempoAtual)}</div>
+          <div className="timer-actions">
+            <button className="timer-icon-button play-button" type="button" onClick={iniciarTempo} aria-label="Iniciar">
+              <Play size={22} fill="currentColor" />
+            </button>
+            <button className="timer-icon-button pause-button" type="button" onClick={pausarTempo} aria-label="Pausar">
+              <Pause size={22} fill="currentColor" />
+            </button>
+            <button className="timer-icon-button reset-button" type="button" onClick={() => setConfirmReset(true)} aria-label="Zerar">
+              <RotateCcw size={22} />
+            </button>
+          </div>
+          <div className="extra-time-btns">
+            <button className="btn-secondary" type="button" onClick={() => addExtraTime(1)}>+1 min</button>
+            <button className="btn-secondary" type="button" onClick={() => addExtraTime(3)}>+3 min</button>
+            <button className="btn-secondary" type="button" onClick={() => addExtraTime(5)}>+5 min</button>
+          </div>
+        </section>
+
+        <section className="match-panel">
+          <div className="section-row">
+            <p className="section-title">Placar</p>
+            <button className="mini-action" type="button" onClick={resetPlacar}>Zerar placar</button>
+          </div>
+          <div className="scoreboard">
+            <TeamCard
+              score={score1}
+              setScore={setScore1}
+              name={team1Name}
+              setName={setTeam1Name}
+              editing={editingTeam === 1}
+              setEditing={() => setEditingTeam(1)}
+              closeEditing={() => setEditingTeam(null)}
+            />
+            <TeamCard
+              score={score2}
+              setScore={setScore2}
+              name={team2Name}
+              setName={setTeam2Name}
+              editing={editingTeam === 2}
+              setEditing={() => setEditingTeam(2)}
+              closeEditing={() => setEditingTeam(null)}
+            />
+          </div>
+        </section>
+      </main>
+
+      {confirmReset && (
+        <div className="modal-overlay" onClick={() => setConfirmReset(false)}>
+          <div className="modal-box compact-modal" onClick={event => event.stopPropagation()}>
+            <h2>Confirmar</h2>
+            <p className="modal-copy">Tem certeza que deseja zerar o tempo?</p>
+            <div className="modal-actions">
+              <button className="btn-outline" type="button" onClick={() => setConfirmReset(false)}>Cancelar</button>
+              <button className="btn-danger" type="button" onClick={resetTempo}>Confirmar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {alertFim && (
+        <TimerFinishedOverlay onClose={() => setAlertFim(false)} onExtraTime={addExtraTime} />
+      )}
+    </div>
+  );
+}
+
+function TimerFinishedOverlay({ onClose, onExtraTime }) {
+  return (
+    <div className="timer-finished" role="alert" aria-live="assertive">
+      <div className="timer-finished-card">
+        <div className="alarm-stage">
+          <div className="alarm-ring ring-a" />
+          <div className="alarm-ring ring-b" />
+          <div className="alarm-core">
+            <Timer size={42} />
+          </div>
+          <span className="beep beep-a">PI</span>
+          <span className="beep beep-b">PI</span>
+          <span className="beep beep-c">PI</span>
+        </div>
+        <p className="draw-kicker">Timer</p>
+        <h2>Fim do tempo!</h2>
+        <p className="draw-copy">pi pi pi pi</p>
+        <div className="timer-finished-actions">
+          <button type="button" onClick={() => onExtraTime(1)}>+1 min</button>
+          <button className="btn-outline" type="button" onClick={onClose}>Fechar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TeamCard({ score, setScore, name, setName, editing, setEditing, closeEditing }) {
+  const [draftName, setDraftName] = useState(name);
+
+  useEffect(() => {
+    setDraftName(name);
+  }, [name]);
+
+  function saveName() {
+    setName(draftName.trim() || name);
+    closeEditing();
+  }
+
+  return (
+    <div className="team-card">
+      {editing ? (
+        <input
+          className="team-name-input"
+          value={draftName}
+          autoFocus
+          onChange={event => setDraftName(event.target.value)}
+          onBlur={saveName}
+          onKeyDown={event => {
+            if (event.key === "Enter") saveName();
+            if (event.key === "Escape") closeEditing();
+          }}
+        />
+      ) : (
+        <button className="team-name" type="button" onClick={setEditing}>{name}</button>
+      )}
+      <div className="score">{score}</div>
+      <div className="score-btns">
+        <button className="btn-secondary" type="button" onClick={() => setScore(prev => Math.max(0, prev - 1))}>-</button>
+        <button type="button" onClick={() => setScore(prev => prev + 1)}>+</button>
+      </div>
+    </div>
+  );
+}
+
+function tocarBeep(vezes = 4, intervalo = 220) {
+  let count = 0;
+  let ctx;
+
+  function beep() {
+    try {
+      ctx ||= new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(980, ctx.currentTime);
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.16, ctx.currentTime + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.12);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.13);
+    } catch {
+      return;
+    }
+
+    count++;
+    if (count < vezes) window.setTimeout(beep, intervalo);
+  }
+
+  beep();
+}
+
+function showNotification(title, body) {
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification(title, { body, icon: "/icon-512.png" });
+  }
+}
+
+export default App;

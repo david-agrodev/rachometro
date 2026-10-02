@@ -278,7 +278,7 @@ function App() {
 
       const coreUrls = ["/", "/index.html", "/manifest.json", "/icon-192.png", "/icon-512.png", "/rachometro-logo.png"];
       caches
-        .open("rachometro-runtime-v6")
+        .open("rachometro-runtime-v7")
         .then(cache => cache.addAll([...new Set([...coreUrls, ...sameOriginResources])]))
         .catch(() => {});
     };
@@ -1147,7 +1147,7 @@ function ScorePage({ logoUrl, goTo, showToast }) {
       setTimerRestanteMs(0);
       setAlertFim(true);
       tocarBeep();
-      showNotification(`${APP_NAME} - Timer`, "O tempo acabou!");
+      void showNotification(`${APP_NAME} - Timer`, "O tempo acabou!");
     }
   }, [mode, running, tempoAtual, setRunStartedAt, setTimerRestanteMs]);
 
@@ -1172,6 +1172,7 @@ function ScorePage({ logoUrl, goTo, showToast }) {
 
   function iniciarTempo() {
     if (running) return;
+    prepararAudioAlerta();
     setAlertFim(false);
     fimTimerNotificadoRef.current = false;
 
@@ -1470,24 +1471,45 @@ function TeamCard({ score, setScore, name, setName, editing, setEditing, closeEd
   );
 }
 
-function tocarBeep(vezes = 4, intervalo = 220) {
+let audioContextAlerta;
+
+function getAudioContextAlerta() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return null;
+  audioContextAlerta ||= new AudioContextClass();
+  return audioContextAlerta;
+}
+
+function prepararAudioAlerta() {
+  try {
+    const ctx = getAudioContextAlerta();
+    if (ctx?.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+  } catch {}
+}
+
+function tocarBeep(vezes = 5, intervalo = 240) {
   let count = 0;
-  let ctx;
 
   function beep() {
     try {
-      ctx ||= new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = getAudioContextAlerta();
+      if (!ctx) return;
+      if (ctx.state === "suspended") {
+        ctx.resume().catch(() => {});
+      }
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "square";
-      osc.frequency.setValueAtTime(980, ctx.currentTime);
+      osc.frequency.setValueAtTime(1040, ctx.currentTime);
       gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.16, ctx.currentTime + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.16);
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.13);
+      osc.stop(ctx.currentTime + 0.17);
     } catch {
       return;
     }
@@ -1499,9 +1521,29 @@ function tocarBeep(vezes = 4, intervalo = 220) {
   beep();
 }
 
-function showNotification(title, body) {
-  if ("Notification" in window && Notification.permission === "granted") {
-    new Notification(title, { body, icon: "/icon-512.png" });
+async function showNotification(title, body) {
+  try {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+    const options = {
+      body,
+      icon: "/icon-512.png",
+      badge: "/icon-192.png",
+      tag: "rachometro-timer",
+      requireInteraction: true
+    };
+
+    if ("serviceWorker" in navigator) {
+      const registration = await navigator.serviceWorker.ready;
+      if (registration?.showNotification) {
+        await registration.showNotification(title, options);
+        return;
+      }
+    }
+
+    new Notification(title, options);
+  } catch {
+    // Android browsers can reject notification construction inside PWAs.
   }
 }
 

@@ -72,6 +72,7 @@ button {
   background: linear-gradient(180deg, var(--brand-2), var(--brand));
   color: #06140e;
   cursor: pointer;
+  touch-action: manipulation;
   font-size: 0.95rem;
   font-family: "Bricolage Grotesque", "Sora", sans-serif;
   font-weight: 900;
@@ -148,6 +149,10 @@ textarea:focus {
 
 .score-shell {
   max-width: 760px;
+}
+
+.draw-shell {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
 }
 
 .app-topbar {
@@ -282,6 +287,10 @@ body.light-theme .match-panel {
   margin-bottom: 12px;
 }
 
+.tight-row {
+  margin-bottom: 8px;
+}
+
 .section-head > span,
 .section-title,
 .mode-toggle > span {
@@ -311,6 +320,103 @@ body.light-theme .match-panel {
 .form-grid {
   display: grid;
   gap: 10px;
+}
+
+.sport-config {
+  display: grid;
+  gap: 10px;
+}
+
+.sport-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.sport-option {
+  min-width: 0;
+  min-height: 58px;
+  flex-direction: column;
+  gap: 5px;
+  border: 1px solid var(--stroke);
+  background: rgba(7, 17, 15, 0.5);
+  color: var(--text-soft);
+  box-shadow: none;
+  font-size: 0.7rem;
+  padding: 7px 4px;
+}
+
+.sport-option.active {
+  border-color: var(--brand);
+  background: rgba(48, 226, 130, 0.14);
+  color: var(--text-main);
+}
+
+.sport-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(121, 242, 177, 0.16);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 30% 24%, rgba(121, 242, 177, 0.18), transparent 42%),
+    rgba(48, 226, 130, 0.08);
+  color: var(--brand-2);
+}
+
+.sport-option.active .sport-icon {
+  border-color: rgba(121, 242, 177, 0.34);
+  background:
+    radial-gradient(circle at 30% 24%, rgba(245, 199, 107, 0.22), transparent 42%),
+    rgba(48, 226, 130, 0.18);
+  color: var(--text-main);
+}
+
+.players-stepper {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(121, 242, 177, 0.12);
+  border-radius: 8px;
+  background: rgba(7, 17, 15, 0.34);
+  padding: 8px;
+}
+
+.players-stepper > span {
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.players-stepper > div,
+.timer-editor {
+  display: grid;
+  grid-template-columns: 42px 1fr 42px;
+  align-items: end;
+  gap: 8px;
+}
+
+.players-stepper input,
+.timer-editor input {
+  min-height: 42px;
+  text-align: center;
+  font-family: "Rajdhani", "Sora", sans-serif;
+  font-size: 1.45rem;
+  font-weight: 900;
+  padding: 6px;
+}
+
+.stepper-button {
+  min-height: 42px;
+  border: 1px solid var(--stroke);
+  background: rgba(23, 42, 37, 0.84);
+  color: var(--text-main);
+  box-shadow: none;
+  font-size: 1.15rem;
+  padding: 0;
 }
 
 .mode-toggle {
@@ -364,6 +470,7 @@ body.light-theme .segmented {
 }
 
 .primary-actions,
+.secondary-actions,
 .compact-actions,
 .extra-time-btns,
 .score-btns {
@@ -374,6 +481,16 @@ body.light-theme .segmented {
 .primary-actions {
   grid-template-columns: 1fr;
   margin-top: 14px;
+}
+
+.secondary-actions {
+  grid-template-columns: 1fr 1fr;
+  margin-top: 12px;
+}
+
+.secondary-actions button {
+  min-height: 42px;
+  font-size: 0.86rem;
 }
 
 .sort-actions {
@@ -586,23 +703,10 @@ body.light-theme .clock {
   background: var(--panel);
 }
 
-.timer-length {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-soft);
-  font-size: 0.82rem;
-  font-weight: 900;
-}
-
-.timer-length input {
-  width: 64px;
-  min-height: 40px;
-  padding: 8px;
-  text-align: center;
-}
-
 .chrono-time {
+  display: grid;
+  gap: 5px;
+  width: 100%;
   margin: 12px 0;
   border: 1px solid rgba(121, 242, 177, 0.14);
   border-radius: 8px;
@@ -616,10 +720,37 @@ body.light-theme .clock {
   line-height: 1;
   padding: 14px 10px;
   text-align: center;
+  box-shadow: none;
 }
 
 body.light-theme .chrono-time {
   background: var(--panel-2);
+}
+
+.chrono-time:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+
+.chrono-time small {
+  width: fit-content;
+  justify-self: center;
+  border: 1px solid rgba(121, 242, 177, 0.22);
+  border-radius: 999px;
+  color: var(--brand-2);
+  font-family: "Sora", sans-serif;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 4px 9px;
+}
+
+.chrono-time.is-editable {
+  cursor: pointer;
+}
+
+.chrono-time.is-editable:active {
+  border-color: var(--brand);
 }
 
 .timer-actions {
@@ -692,9 +823,11 @@ body.light-theme .chrono-time {
     rgba(2, 9, 7, 0.84);
   backdrop-filter: blur(10px);
   padding: 18px;
+  touch-action: manipulation;
 }
 
 .timer-finished-card {
+  position: relative;
   width: min(100%, 350px);
   border: 1px solid rgba(239, 90, 97, 0.26);
   border-radius: 8px;
@@ -703,6 +836,10 @@ body.light-theme .chrono-time {
   padding: 22px 18px 18px;
   text-align: center;
   animation: suspenseEnter 260ms ease-out both;
+}
+
+.alarm-close {
+  border-color: rgba(239, 90, 97, 0.32);
 }
 
 .alarm-stage {
@@ -785,6 +922,22 @@ body.light-theme .chrono-time {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin-top: 16px;
+}
+
+.timer-editor {
+  margin: 14px 0 10px;
+}
+
+.timer-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 7px;
+}
+
+.timer-presets button {
+  min-height: 38px;
+  font-size: 0.78rem;
+  padding: 6px;
 }
 
 @keyframes alarmPulse {
@@ -1124,6 +1277,7 @@ body.light-theme .chrono-time {
 }
 
 .modal-box {
+  position: relative;
   width: 100%;
   max-width: 560px;
   max-height: min(88dvh, 760px);
@@ -1134,6 +1288,21 @@ body.light-theme .chrono-time {
   color: var(--text-main);
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.55);
   padding: 18px;
+}
+
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 36px;
+  min-height: 36px;
+  border: 1px solid rgba(121, 242, 177, 0.22);
+  border-radius: 50%;
+  background: rgba(7, 17, 15, 0.58);
+  color: var(--text-main);
+  padding: 0;
+  box-shadow: none;
 }
 
 body.light-theme .modal-box {
@@ -1198,6 +1367,11 @@ body.light-theme .modal-box {
   margin-bottom: 2px;
 }
 
+.card-tip > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .modal-copy {
   color: var(--text-soft);
   line-height: 1.5;
@@ -1216,18 +1390,41 @@ body.light-theme .modal-box {
   margin-top: 14px;
 }
 
-.floating-help {
+.bottom-action-bar {
   position: fixed;
-  right: 14px;
-  bottom: 14px;
-  z-index: 40;
-  width: 48px;
-  min-height: 48px;
-  border: 1px solid rgba(121, 242, 177, 0.28);
-  border-radius: 50%;
-  background: rgba(23, 42, 37, 0.94);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 45;
+  display: grid;
+  grid-template-columns: 1fr 52px 52px;
+  gap: 8px;
+  width: min(100%, 760px);
+  margin: 0 auto;
+  padding: 12px 10px calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(7, 17, 15, 0), rgba(7, 17, 15, 0.96) 34%, rgba(7, 17, 15, 0.99));
+  pointer-events: none;
+}
+
+.bottom-action-bar button {
+  pointer-events: auto;
+}
+
+.bottom-main-action,
+.bottom-icon-action {
+  min-height: 52px;
+  border: 1px solid rgba(121, 242, 177, 0.24);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.32);
+}
+
+.bottom-icon-action {
+  background: rgba(23, 42, 37, 0.96);
   color: var(--text-main);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
+  padding: 0;
+}
+
+body.light-theme .bottom-action-bar {
+  background: linear-gradient(180deg, rgba(237, 245, 240, 0), rgba(237, 245, 240, 0.96) 34%, rgba(237, 245, 240, 0.99));
 }
 
 .toast {
@@ -1293,6 +1490,10 @@ body.light-theme .modal-box {
 @media (max-width: 640px) {
   .app-shell {
     padding: 10px;
+  }
+
+  .draw-shell {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
   }
 
   .app-topbar {

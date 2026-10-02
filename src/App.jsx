@@ -4,7 +4,10 @@ import {
   Clipboard,
   ClipboardCheck,
   ClipboardList,
+  Dribbble,
+  Goal,
   Info,
+  LandPlot,
   List,
   Pause,
   Play,
@@ -17,7 +20,9 @@ import {
   Trash2,
   Trophy,
   UserPlus,
-  Star
+  Volleyball,
+  Star,
+  X
 } from "lucide-react";
 
 const APP_NAME = "RachôMetro";
@@ -36,10 +41,10 @@ const CAB_JOGS = [
 const CAB_ESPERA = ["LISTA DE ESPERA", "ESPERA", "RESERVA", "SUPLENTE"];
 const CAB_SEPARAR = ["SEPARAR", "SEPARAR CRAQUES", "NAO JUNTAR", "EVITAR JUNTOS"];
 const MODALIDADES = [
-  { value: "futsal", label: "FUTSAL", jogadores: 5 },
-  { value: "society", label: "SOCIETY", jogadores: 6 },
-  { value: "campo", label: "CAMPO", jogadores: 11 },
-  { value: "volei", label: "VÔLEI", jogadores: 6 }
+  { value: "futsal", label: "FUTSAL", jogadores: 5, icon: Goal },
+  { value: "society", label: "SOCIETY", jogadores: 6, icon: Dribbble },
+  { value: "campo", label: "CAMPO", jogadores: 11, icon: LandPlot },
+  { value: "volei", label: "VOLEI", jogadores: 6, icon: Volleyball }
 ];
 
 const MODELO_LISTA = `✅ LISTA DOS CONFIRMADOS
@@ -209,8 +214,56 @@ function App() {
 
   useEffect(() => {
     if (import.meta.env.PROD && "serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/service-worker.js").catch(() => {});
+      let refreshing = false;
+      let updateTimer;
+      let handleVisibilityChange;
+
+      const reloadWhenUpdated = () => {
+        if (refreshing) return;
+        refreshing = true;
+        window.location.reload();
+      };
+
+      const activateWaitingWorker = registration => {
+        if (registration.waiting) {
+          registration.waiting.postMessage({ type: "SKIP_WAITING" });
+        }
+      };
+
+      navigator.serviceWorker.addEventListener("controllerchange", reloadWhenUpdated);
+
+      navigator.serviceWorker.register("/service-worker.js").then(registration => {
+        activateWaitingWorker(registration);
+
+        registration.addEventListener("updatefound", () => {
+          const nextWorker = registration.installing;
+          if (!nextWorker) return;
+
+          nextWorker.addEventListener("statechange", () => {
+            if (nextWorker.state === "installed" && navigator.serviceWorker.controller) {
+              nextWorker.postMessage({ type: "SKIP_WAITING" });
+            }
+          });
+        });
+
+        const checkForUpdate = () => registration.update().catch(() => {});
+        updateTimer = window.setInterval(checkForUpdate, 30 * 60 * 1000);
+        handleVisibilityChange = () => {
+          if (document.visibilityState === "visible") checkForUpdate();
+        };
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+      }).catch(() => {});
+
+      return () => {
+        navigator.serviceWorker.removeEventListener("controllerchange", reloadWhenUpdated);
+        window.clearInterval(updateTimer);
+        if (handleVisibilityChange) {
+          document.removeEventListener("visibilitychange", handleVisibilityChange);
+        }
+      };
     }
+
+    return undefined;
   }, []);
 
   useEffect(() => {
@@ -225,7 +278,7 @@ function App() {
 
       const coreUrls = ["/", "/index.html", "/manifest.json", "/icon-192.png", "/icon-512.png", "/rachometro-logo.png"];
       caches
-        .open("rachometro-runtime-v2")
+        .open("rachometro-runtime-v6")
         .then(cache => cache.addAll([...new Set([...coreUrls, ...sameOriginResources])]))
         .catch(() => {});
     };
@@ -284,6 +337,7 @@ function DrawPage({ logoUrl, goTo, showToast }) {
 
   const todosNomes = useMemo(() => [...goleiros, ...jogadores], [goleiros, jogadores]);
   const temNomes = goleiros.length + jogadores.length > 0;
+  const podeAcaoPrincipal = temNomes || (modoEntrada === "lista" && textoBruto.trim().length > 0);
 
   const previewLista = useMemo(() => {
     const linhas = [];
@@ -423,7 +477,7 @@ function DrawPage({ logoUrl, goTo, showToast }) {
     }
 
     const novosAvisos = aplicarRestricoes(novosTimes, gruposRestritos);
-    const texto = montarTextoTimes(novosTimes, modalidade, novosAvisos, craquesMarcados);
+    const texto = montarTextoWhatsApp(novosTimes, modalidade, novosAvisos, craquesMarcados);
     setTimes(novosTimes);
     setAvisos(novosAvisos);
     setUltimoTextoCopiavel(texto);
@@ -431,6 +485,36 @@ function DrawPage({ logoUrl, goTo, showToast }) {
     window.setTimeout(() => {
       resultadosRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 80);
+  }
+
+  function montarTextoWhatsApp(timesMontados, modalidadeAtual, avisosRestricao, craquesMarcados = craquesAplicados) {
+    const modalidadeLabel = MODALIDADES.find(item => item.value === modalidadeAtual)?.label || modalidadeAtual.toUpperCase();
+    const totalJogadores = timesMontados.reduce((total, time) => total + time.length, 0);
+    let texto = `🏆 *RachôMetro - Sorteio dos Times*\n`;
+    texto += `⚽ *Modalidade:* ${modalidadeLabel}\n`;
+    texto += `👥 *Por time:* ${jogadoresPorTime} jogadores\n`;
+    texto += `🎲 *Total:* ${totalJogadores} jogadores em ${timesMontados.length} times\n`;
+    texto += `━━━━━━━━━━━━━━\n\n`;
+
+    timesMontados.forEach((time, index) => {
+      texto += `🟢 *TIME ${index + 1}* (${time.length})\n`;
+      time.forEach(jogador => {
+        const isGoleiro = jogador.toUpperCase().includes("(GOL)");
+        const craque = ehCraque(jogador, craquesMarcados);
+        const nome = jogador.replace(/\s*\(GOL\)/i, "").trim();
+        const prefixo = craque ? "⭐" : isGoleiro ? "🧤" : "•";
+        const detalhe = isGoleiro ? " _GOL_" : "";
+        texto += `${prefixo} ${nome}${detalhe}\n`;
+      });
+      texto += "\n";
+    });
+
+    if (avisosRestricao.length) {
+      texto += `⚠️ *Avisos*\n${avisosRestricao.map(aviso => `• ${aviso}`).join("\n")}\n\n`;
+    }
+
+    texto += `Gerado pelo ${APP_NAME}`;
+    return texto.trim();
   }
 
   function montarTextoTimes(timesMontados, modalidadeAtual, avisosRestricao, craquesMarcados = craquesAplicados) {
@@ -575,8 +659,28 @@ function DrawPage({ logoUrl, goTo, showToast }) {
     if (config) setJogadoresPorTime(config.jogadores);
   }
 
+  function ajustarJogadoresPorTime(delta) {
+    setJogadoresPorTime(prev => Math.max(1, Number(prev || 1) + delta));
+  }
+
+  function executarAcaoPrincipal() {
+    if (temNomes) {
+      sortearTimes();
+      return;
+    }
+    processarLista();
+  }
+
+  function copiarTimes() {
+    if (ultimoTextoCopiavel) {
+      copiarTexto(ultimoTextoCopiavel, "Times copiados.");
+      return;
+    }
+    showToast("Sorteie os times primeiro.");
+  }
+
   return (
-    <div className="app-shell">
+    <div className="app-shell draw-shell">
       <header className="app-topbar">
         <div className="brand-lockup">
           <img className="brand-logo" src={logoUrl} alt={APP_NAME} />
@@ -597,24 +701,39 @@ function DrawPage({ logoUrl, goTo, showToast }) {
             <span>Configuração</span>
             <p className="status-pill">Goleiros: {goleiros.length} | Jogadores: {jogadores.length}</p>
           </div>
-          <div className="form-grid">
-            <label>
-              Modalidade
-              <select value={modalidade} onChange={event => mudarModalidade(event.target.value)}>
-                {MODALIDADES.map(item => (
-                  <option value={item.value} key={item.value}>{item.label}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Por time
-              <input
-                type="number"
-                min="1"
-                value={jogadoresPorTime}
-                onChange={event => setJogadoresPorTime(event.target.value)}
-              />
-            </label>
+          <div className="sport-config">
+            <div className="sport-options" aria-label="Modalidade">
+              {MODALIDADES.map(item => {
+                const SportIcon = item.icon;
+                return (
+                  <button
+                    className={modalidade === item.value ? "sport-option active" : "sport-option"}
+                    type="button"
+                    key={item.value}
+                    onClick={() => mudarModalidade(item.value)}
+                  >
+                    <span className="sport-icon">
+                      <SportIcon size={20} strokeWidth={2.4} />
+                    </span>
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="players-stepper" aria-label="Jogadores por time">
+              <span>Por time</span>
+              <div>
+                <button className="stepper-button" type="button" onClick={() => ajustarJogadoresPorTime(-1)} aria-label="Diminuir jogadores por time">-</button>
+                <input
+                  type="number"
+                  min="1"
+                  value={jogadoresPorTime}
+                  onChange={event => setJogadoresPorTime(Math.max(1, Number(event.target.value) || 1))}
+                  aria-label="Jogadores por time"
+                />
+                <button className="stepper-button" type="button" onClick={() => ajustarJogadoresPorTime(1)} aria-label="Aumentar jogadores por time">+</button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -639,18 +758,14 @@ function DrawPage({ logoUrl, goTo, showToast }) {
                   <textarea
                     value={textoBruto}
                     onChange={event => setTextoBruto(event.target.value)}
-                    placeholder={"Cole aqui a mensagem com:\nGOLEIROS\nATLETAS DE ALTO NÍVEL\nLISTA DE ESPERA"}
+                    placeholder={"Cole a lista oficial do grupo.\nExemplo:\nGOLEIROS\nATLETAS\nLISTA DE ESPERA"}
                   />
                   <button className="paste-btn" type="button" onClick={colarLista}>
                     Colar
                   </button>
                 </div>
               </label>
-              <div className="primary-actions">
-                <button type="button" onClick={processarLista}>
-                  <Shuffle size={19} />
-                  Processar
-                </button>
+              <div className="secondary-actions">
                 <button className="btn-outline" type="button" onClick={() => copiarTexto(MODELO_LISTA, "Modelo copiado.")}>
                   <ClipboardList size={18} />
                   Modelo
@@ -728,24 +843,6 @@ function DrawPage({ logoUrl, goTo, showToast }) {
             </div>
           )}
 
-          {temNomes && (
-            <div className="primary-actions sort-actions">
-              <button type="button" onClick={sortearTimes} disabled={sorteando}>
-                <Sparkles size={19} />
-                {sorteando ? "Sorteando..." : "Sortear novamente"}
-              </button>
-              <button
-                className="btn-outline"
-                type="button"
-                onClick={() => ultimoTextoCopiavel ? copiarTexto(ultimoTextoCopiavel, "Times copiados.") : showToast("Sorteie os times primeiro.")}
-                disabled={!ultimoTextoCopiavel}
-              >
-                <Clipboard size={18} />
-                Copiar times
-              </button>
-            </div>
-          )}
-
           {modoEntrada === "manual" && (
             <label>
               Prévia
@@ -786,6 +883,19 @@ function DrawPage({ logoUrl, goTo, showToast }) {
 
       <p className="footer-info">{APP_NAME}</p>
 
+      <div className="bottom-action-bar" role="toolbar" aria-label="Acoes do sorteio">
+        <button className="bottom-main-action" type="button" onClick={executarAcaoPrincipal} disabled={sorteando || !podeAcaoPrincipal}>
+          {temNomes ? <Sparkles size={19} /> : <Shuffle size={19} />}
+          {sorteando ? "Sorteando..." : temNomes ? "Sortear" : "Processar"}
+        </button>
+        <button className="bottom-icon-action" type="button" onClick={copiarTimes} disabled={!ultimoTextoCopiavel} aria-label="Copiar times">
+          <Clipboard size={20} />
+        </button>
+        <button className="bottom-icon-action" type="button" onClick={() => setModalGuiaAberto(true)} aria-label="Abrir ajuda">
+          <Info size={20} />
+        </button>
+      </div>
+
       {modalGuiaAberto && (
         <GuideModal onClose={() => setModalGuiaAberto(false)} onCopyModel={() => copiarTexto(MODELO_LISTA, "Modelo copiado.")} />
       )}
@@ -805,9 +915,6 @@ function DrawPage({ logoUrl, goTo, showToast }) {
         <DrawSuspenseOverlay totalNomes={goleiros.length + jogadores.length} totalGoleiros={goleiros.length} />
       )}
 
-      <button className="floating-help" type="button" onClick={() => setModalGuiaAberto(true)} aria-label="Abrir guia rápido">
-        <Info size={19} />
-      </button>
     </div>
   );
 }
@@ -873,14 +980,20 @@ function GuideModal({ onClose, onCopyModel }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" onClick={event => event.stopPropagation()}>
+        <button className="modal-close" type="button" onClick={onClose} aria-label="Fechar ajuda">
+          <X size={18} />
+        </button>
         <div className="modal-head">
           <div className="modal-chip"><Info size={16} /> Guia rápido</div>
-          <h2>Bem-vindo ao sorteio</h2>
+          <h2>Como usar sem erro</h2>
         </div>
+        <p className="modal-copy">
+          Cole a lista, ajuste os craques se precisar e use a barra de baixo para processar, sortear ou copiar.
+        </p>
         <div className="modal-grid">
-          <Tip icon={<ClipboardCheck />} title="Passo a passo">Cole a lista, processe, sorteie e copie os times.</Tip>
-          <Tip icon={<Tag />} title="Cabeçalhos aceitos">GOLEIRO/GOL e ATLETAS/ATLETA/LINHA/JOGADOR.</Tip>
-          <Tip icon={<List />} title="Modelo pronto">Use o modelo para padronizar a lista do grupo.</Tip>
+          <Tip icon={<ClipboardCheck />} title="Lista">Cole a mensagem e use Processar na barra fixa de baixo.</Tip>
+          <Tip icon={<Tag />} title="Cabeçalhos aceitos">Use GOLEIROS, GOL, ATLETAS ou LINHA.</Tip>
+          <Tip icon={<List />} title="Modelo">Copie o modelo para evitar erro de cabecalho no grupo.</Tip>
           <Tip icon={<RotateCcw />} title="Goleiro por time">Se faltar goleiro, o app repete em rodízio.</Tip>
         </div>
         <div className="modal-actions">
@@ -958,6 +1071,8 @@ function ScorePage({ logoUrl, goTo, showToast }) {
   const [runStartedAt, setRunStartedAt] = usePersistentNumber("timerRunStartedAt", 0);
   const [elapsedMs, setElapsedMs] = usePersistentNumber("elapsedMs", 0);
   const [timerMinutes, setTimerMinutes] = useState(() => Number(localStorage.getItem("timerMinutes")) || 7);
+  const [timerEditorOpen, setTimerEditorOpen] = useState(false);
+  const [draftTimerMinutes, setDraftTimerMinutes] = useState(() => Number(localStorage.getItem("timerMinutes")) || 7);
   const [timerRestanteMs, setTimerRestanteMs] = usePersistentNumber("timerRestanteMs", 7 * 60 * 1000);
   const [alertFim, setAlertFim] = useState(false);
   const [score1, setScore1] = usePersistentNumber("score1", 0);
@@ -998,6 +1113,10 @@ function ScorePage({ logoUrl, goTo, showToast }) {
   useEffect(() => {
     localStorage.setItem("timerMinutes", String(timerMinutes));
   }, [timerMinutes]);
+
+  useEffect(() => {
+    if (timerEditorOpen) setDraftTimerMinutes(timerMinutes);
+  }, [timerEditorOpen, timerMinutes]);
 
   useEffect(() => {
     localStorage.setItem("team1Name", team1Name);
@@ -1092,6 +1211,22 @@ function ScorePage({ logoUrl, goTo, showToast }) {
     if (mode === "timer" && !running) setTimerRestanteMs(minutes * 60 * 1000);
   }
 
+  function ajustarDraftTimer(delta) {
+    setDraftTimerMinutes(prev => Math.max(1, Math.min(99, Number(prev || 1) + delta)));
+  }
+
+  function aplicarTimerEdit() {
+    const minutes = Math.max(1, Math.min(99, Number(draftTimerMinutes) || 7));
+    setTimerMinutes(minutes);
+    if (mode === "timer") {
+      setTimerRestanteMs(minutes * 60 * 1000);
+      setRunStartedAt(running ? Date.now() : 0);
+      setAlertFim(false);
+      fimTimerNotificadoRef.current = false;
+    }
+    setTimerEditorOpen(false);
+  }
+
   function addExtraTime(minutes) {
     if (mode !== "timer") return;
     if (running) {
@@ -1101,6 +1236,16 @@ function ScorePage({ logoUrl, goTo, showToast }) {
       setTimerRestanteMs(prev => prev + minutes * 60 * 1000);
     }
     setAlertFim(false);
+  }
+
+  function fecharAlertaTimer() {
+    setAlertFim(false);
+    setRunning(false);
+    setRunStartedAt(0);
+    fimTimerNotificadoRef.current = true;
+    if (mode === "timer") {
+      setTimerRestanteMs(Number(timerMinutes) * 60 * 1000);
+    }
   }
 
   function resetPlacar() {
@@ -1134,18 +1279,8 @@ function ScorePage({ logoUrl, goTo, showToast }) {
 
       <main className="match-layout">
         <section className="match-panel timer-panel">
-          <div className="section-row">
+          <div className="section-row tight-row">
             <p className="section-title">{mode === "chrono" ? "Cronômetro do racha" : "Timer da partida"}</p>
-            <label className="timer-length">
-              <input
-                type="number"
-                min="1"
-                max="99"
-                value={timerMinutes}
-                onChange={event => mudarTimerMinutes(event.target.value)}
-              />
-              <span>min</span>
-            </label>
           </div>
 
           <div className="segmented">
@@ -1153,7 +1288,15 @@ function ScorePage({ logoUrl, goTo, showToast }) {
             <button className={mode === "timer" ? "active" : ""} type="button" onClick={setModoTimer}>Timer</button>
           </div>
 
-          <div className="chrono-time">{formatarMs(tempoAtual)}</div>
+          <button
+            className={mode === "timer" ? "chrono-time is-editable" : "chrono-time"}
+            type="button"
+            onClick={() => mode === "timer" && setTimerEditorOpen(true)}
+            aria-label={mode === "timer" ? "Ajustar tempo do timer" : "Tempo atual"}
+          >
+            <span>{formatarMs(tempoAtual)}</span>
+            {mode === "timer" && <small>{timerMinutes} min</small>}
+          </button>
           <div className="timer-actions">
             <button className="timer-icon-button play-button" type="button" onClick={iniciarTempo} aria-label="Iniciar">
               <Play size={22} fill="currentColor" />
@@ -1200,6 +1343,46 @@ function ScorePage({ logoUrl, goTo, showToast }) {
         </section>
       </main>
 
+      {timerEditorOpen && (
+        <div className="modal-overlay" onClick={() => setTimerEditorOpen(false)}>
+          <div className="modal-box compact-modal" onClick={event => event.stopPropagation()}>
+            <button className="modal-close" type="button" onClick={() => setTimerEditorOpen(false)} aria-label="Fechar ajuste de tempo">
+              <X size={18} />
+            </button>
+            <div className="modal-head">
+              <div className="modal-chip"><Timer size={16} /> Timer</div>
+              <h2>Ajustar tempo</h2>
+            </div>
+            <div className="timer-editor">
+              <button className="stepper-button" type="button" onClick={() => ajustarDraftTimer(-1)} aria-label="Diminuir tempo">-</button>
+              <label>
+                Minutos
+                <input
+                  type="number"
+                  min="1"
+                  max="99"
+                  value={draftTimerMinutes}
+                  onChange={event => setDraftTimerMinutes(Math.max(1, Math.min(99, Number(event.target.value) || 1)))}
+                  autoFocus
+                />
+              </label>
+              <button className="stepper-button" type="button" onClick={() => ajustarDraftTimer(1)} aria-label="Aumentar tempo">+</button>
+            </div>
+            <div className="timer-presets">
+              {[5, 7, 10, 15].map(minutes => (
+                <button className="btn-outline" type="button" key={minutes} onClick={() => setDraftTimerMinutes(minutes)}>
+                  {minutes} min
+                </button>
+              ))}
+            </div>
+            <div className="modal-actions">
+              <button className="btn-outline" type="button" onClick={() => setTimerEditorOpen(false)}>Cancelar</button>
+              <button type="button" onClick={aplicarTimerEdit}>Aplicar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {confirmReset && (
         <div className="modal-overlay" onClick={() => setConfirmReset(false)}>
           <div className="modal-box compact-modal" onClick={event => event.stopPropagation()}>
@@ -1214,7 +1397,7 @@ function ScorePage({ logoUrl, goTo, showToast }) {
       )}
 
       {alertFim && (
-        <TimerFinishedOverlay onClose={() => setAlertFim(false)} onExtraTime={addExtraTime} />
+        <TimerFinishedOverlay onClose={fecharAlertaTimer} onExtraTime={addExtraTime} />
       )}
     </div>
   );
@@ -1222,8 +1405,11 @@ function ScorePage({ logoUrl, goTo, showToast }) {
 
 function TimerFinishedOverlay({ onClose, onExtraTime }) {
   return (
-    <div className="timer-finished" role="alert" aria-live="assertive">
-      <div className="timer-finished-card">
+    <div className="timer-finished" role="alert" aria-live="assertive" onClick={onClose}>
+      <div className="timer-finished-card" onClick={event => event.stopPropagation()}>
+        <button className="modal-close alarm-close" type="button" onClick={onClose} aria-label="Fechar alerta">
+          <X size={18} />
+        </button>
         <div className="alarm-stage">
           <div className="alarm-ring ring-a" />
           <div className="alarm-ring ring-b" />

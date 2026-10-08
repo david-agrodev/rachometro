@@ -1,4 +1,4 @@
-const CACHE_NAME = "rachometro-v8";
+const CACHE_NAME = "rachometro-v9";
 const APP_SHELL = [
   "/",
   "/index.html",

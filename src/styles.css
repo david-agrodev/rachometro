@@ -518,6 +518,10 @@ body.light-theme .segmented {
   padding: 12px;
 }
 
+.payment-box input {
+  min-height: 44px;
+}
+
 body.light-theme .tool-box {
   background: var(--panel-2);
 }
@@ -544,6 +548,69 @@ body.light-theme .tool-box {
   border-color: var(--brand);
   background: rgba(48, 226, 130, 0.14);
   color: var(--brand-2);
+}
+
+.name-chip.late-chip {
+  border-color: rgba(245, 199, 107, 0.4);
+  background: rgba(245, 199, 107, 0.12);
+  color: var(--gold);
+}
+
+.payment-summary {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
+  border: 1px solid rgba(121, 242, 177, 0.14);
+  border-radius: 8px;
+  background: rgba(7, 17, 15, 0.34);
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  padding: 10px;
+}
+
+.payment-summary strong {
+  color: var(--brand-2);
+  font-size: 1.1rem;
+}
+
+.payment-list {
+  display: grid;
+  gap: 7px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.payment-chip {
+  justify-content: flex-start;
+  min-height: 40px;
+  border: 1px solid var(--stroke);
+  background: rgba(12, 23, 20, 0.62);
+  color: var(--text-main);
+  box-shadow: none;
+  font-size: 0.86rem;
+  padding: 8px 10px;
+}
+
+.payment-chip span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(171, 193, 184, 0.12);
+  color: var(--text-soft);
+}
+
+.payment-chip.paid {
+  border-color: rgba(48, 226, 130, 0.44);
+  background: rgba(48, 226, 130, 0.12);
+  color: var(--brand-2);
+}
+
+.payment-chip.paid span {
+  background: var(--brand);
+  color: #06140e;
 }
 
 .pair-chip {
@@ -634,6 +701,10 @@ body.light-theme .team-card {
   color: var(--text-main);
 }
 
+.time-card li.atrasado {
+  color: var(--gold);
+}
+
 .player-name {
   display: inline-flex;
   align-items: center;
@@ -645,6 +716,11 @@ body.light-theme .team-card {
   flex: 0 0 auto;
   color: var(--gold);
   filter: drop-shadow(0 0 8px rgba(245, 199, 107, 0.32));
+}
+
+.late-mark {
+  flex: 0 0 auto;
+  font-size: 0.88rem;
 }
 
 .badge {
@@ -664,6 +740,16 @@ body.light-theme .team-card {
   font-size: 0.72rem;
   font-weight: 900;
   padding: 2px 7px;
+}
+
+.tag-late {
+  border: 1px solid rgba(245, 199, 107, 0.32);
+  border-radius: 999px;
+  background: rgba(245, 199, 107, 0.12);
+  color: var(--gold);
+  font-size: 0.68rem;
+  font-weight: 900;
+  padding: 2px 6px;
 }
 
 .warning-line {
@@ -1382,10 +1468,22 @@ body.light-theme .modal-box {
   margin: 4px 0 12px;
 }
 
+.modal-subtitle {
+  margin: 12px 0 0;
+  color: var(--text-main);
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 .modal-name-grid {
   max-height: 42dvh;
   overflow-y: auto;
   padding: 8px 2px;
+}
+
+.compact-name-grid {
+  max-height: 24dvh;
 }
 
 .modal-actions {

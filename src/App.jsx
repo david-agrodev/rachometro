@@ -303,7 +303,7 @@ function App() {
 
       const coreUrls = ["/", "/index.html", "/manifest.json", "/icon-192.png", "/icon-512.png", "/rachometro-logo.png"];
       caches
-        .open("rachometro-runtime-v8")
+        .open("rachometro-runtime-v9")
         .then(cache => cache.addAll([...new Set([...coreUrls, ...sameOriginResources])]))
         .catch(() => {});
     };
@@ -350,19 +350,28 @@ function DrawPage({ logoUrl, goTo, showToast }) {
   const [paresRestritos, setParesRestritos] = useState([]);
   const [selecaoGrupo, setSelecaoGrupo] = useState([]);
   const [selecaoCraques, setSelecaoCraques] = useState([]);
+  const [selecaoAtrasados, setSelecaoAtrasados] = useState([]);
   const [secaoSepararAberta, setSecaoSepararAberta] = useState(false);
   const [secaoCorrigirAberta, setSecaoCorrigirAberta] = useState(false);
+  const [secaoAtrasadosAberta, setSecaoAtrasadosAberta] = useState(false);
+  const [secaoPagamentoAberta, setSecaoPagamentoAberta] = useState(false);
   const [times, setTimes] = useState([]);
   const [avisos, setAvisos] = useState([]);
   const [ultimoTextoCopiavel, setUltimoTextoCopiavel] = useState("");
   const [sorteando, setSorteando] = useState(false);
   const [craquesAplicados, setCraquesAplicados] = useState([]);
+  const [atrasadosAplicados, setAtrasadosAplicados] = useState([]);
+  const [valorQuadra, setValorQuadra] = useState("");
+  const [pagamentos, setPagamentos] = useState({});
   const suspenseTimer = useRef(null);
   const resultadosRef = useRef(null);
 
   const todosNomes = useMemo(() => [...goleiros, ...jogadores], [goleiros, jogadores]);
   const temNomes = goleiros.length + jogadores.length > 0;
   const podeAcaoPrincipal = temNomes || (modoEntrada === "lista" && textoBruto.trim().length > 0);
+  const valorQuadraNumero = Number(String(valorQuadra).replace(",", ".")) || 0;
+  const valorPorJogador = jogadores.length ? valorQuadraNumero / jogadores.length : 0;
+  const totalPago = jogadores.filter(nome => pagamentos[normalizarNomeJogador(nome)]).length;
 
   const previewLista = useMemo(() => {
     const linhas = [];
@@ -385,6 +394,20 @@ function DrawPage({ logoUrl, goTo, showToast }) {
   useEffect(() => {
     return () => window.clearTimeout(suspenseTimer.current);
   }, []);
+
+  useEffect(() => {
+    const nomesValidos = new Set(jogadores.map(normalizarNomeJogador));
+    setAtrasadosAplicados(prev => prev.filter(nome => nomesValidos.has(normalizarNomeJogador(nome))));
+    setSelecaoAtrasados(prev => prev.filter(nome => nomesValidos.has(normalizarNomeJogador(nome))));
+    setPagamentos(prev => {
+      const proximo = {};
+      for (const nome of jogadores) {
+        const chave = normalizarNomeJogador(nome);
+        if (prev[chave]) proximo[chave] = true;
+      }
+      return proximo;
+    });
+  }, [jogadores]);
 
   function processarLista() {
     if (!textoBruto.trim()) {
@@ -431,7 +454,10 @@ function DrawPage({ logoUrl, goTo, showToast }) {
     setParesRestritos([]);
     setSelecaoGrupo([]);
     setSelecaoCraques([]);
+    setSelecaoAtrasados([]);
     setCraquesAplicados([]);
+    setAtrasadosAplicados([]);
+    setPagamentos({});
     setTimes([]);
     setAvisos([]);
     setUltimoTextoCopiavel("");
@@ -440,15 +466,18 @@ function DrawPage({ logoUrl, goTo, showToast }) {
 
   function finalizarCraques(aplicar) {
     const craques = aplicar ? [...selecaoCraques] : [];
+    const atrasados = [...selecaoAtrasados];
     setParesRestritos(craques.length > 1 ? [craques] : []);
     setCraquesAplicados(craques);
+    setAtrasadosAplicados(atrasados);
     setModalCraquesAberto(false);
     setSelecaoCraques([]);
-    showToast(craques.length ? "Craques marcados. Sorteando..." : "Sorteando sem separar craques...");
-    sortearTimes(craques.length > 1 ? [craques] : [], craques);
+    setSelecaoAtrasados([]);
+    showToast(atrasados.length ? "Atrasados no último time. Sorteando..." : craques.length ? "Craques marcados. Sorteando..." : "Sorteando sem separar craques...");
+    sortearTimes(craques.length > 1 ? [craques] : [], craques, atrasados);
   }
 
-  function sortearTimes(gruposForcados, craquesForcados = craquesAplicados) {
+  function sortearTimes(gruposForcados, craquesForcados = craquesAplicados, atrasadosForcados = atrasadosAplicados) {
     if (sorteando) return;
     const gruposRestritos = Array.isArray(gruposForcados) ? gruposForcados : paresRestritos;
 
@@ -469,16 +498,17 @@ function DrawPage({ logoUrl, goTo, showToast }) {
     setUltimoTextoCopiavel("");
 
     suspenseTimer.current = window.setTimeout(() => {
-      executarSorteio(porTime, gruposRestritos, craquesForcados);
+      executarSorteio(porTime, gruposRestritos, craquesForcados, atrasadosForcados);
       setSorteando(false);
     }, 2300);
   }
 
-  function executarSorteio(porTime, gruposRestritos = paresRestritos, craquesMarcados = craquesAplicados) {
+  function executarSorteio(porTime, gruposRestritos = paresRestritos, craquesMarcados = craquesAplicados, atrasadosMarcados = atrasadosAplicados) {
     let jogadoresSorteio = [...jogadores];
     const goleirosSorteio = [...goleiros];
     const numTimes = calcularQuantidadeTimes(goleirosSorteio.length, jogadoresSorteio.length, porTime);
     const novosTimes = Array.from({ length: numTimes }, () => []);
+    const atrasadosSet = new Set(atrasadosMarcados.map(normalizarNomeJogador));
 
     if (goleirosSorteio.length > 0 && goleirosSorteio.length < numTimes && porTime > 1) {
       for (let t = 0; t < numTimes; t++) {
@@ -492,17 +522,34 @@ function DrawPage({ logoUrl, goTo, showToast }) {
       jogadoresSorteio.push(...goleirosSorteio.slice(numTimes).map(goleiro => `${goleiro} (GOL)`));
     }
 
-    jogadoresSorteio = embaralhar(jogadoresSorteio);
+    const jogadoresAtrasados = jogadoresSorteio.filter(jogador => atrasadosSet.has(normalizarNomeJogador(jogador)));
+    jogadoresSorteio = embaralhar(jogadoresSorteio.filter(jogador => !atrasadosSet.has(normalizarNomeJogador(jogador))));
+
     let iJog = 0;
+    const ultimoTimeIndex = numTimes - 1;
     for (let t = 0; t < numTimes; t++) {
-      while (novosTimes[t].length < porTime && iJog < jogadoresSorteio.length) {
+      const limiteTime = t === ultimoTimeIndex ? Math.max(0, porTime - jogadoresAtrasados.length) : porTime;
+      while (novosTimes[t].length < limiteTime && iJog < jogadoresSorteio.length) {
         novosTimes[t].push(jogadoresSorteio[iJog]);
         iJog++;
       }
     }
 
     const novosAvisos = aplicarRestricoes(novosTimes, gruposRestritos);
-    const texto = montarTextoWhatsApp(novosTimes, modalidade, novosAvisos, craquesMarcados);
+    if (iJog < jogadoresSorteio.length && novosTimes.length) {
+      novosTimes[ultimoTimeIndex].push(...jogadoresSorteio.slice(iJog));
+      novosAvisos.push("Alguns atletas também foram para o último time para ninguém ficar fora.");
+    }
+    if (jogadoresAtrasados.length && novosTimes.length) {
+      novosTimes[ultimoTimeIndex].push(...embaralhar(jogadoresAtrasados));
+    }
+    if (jogadoresAtrasados.length) {
+      novosAvisos.push(`Atrasados no último time: ${jogadoresAtrasados.join(", ")}.`);
+    }
+    if (novosTimes[novosTimes.length - 1]?.length > porTime) {
+      novosAvisos.push("O último time ficou maior porque há muitos atrasados marcados.");
+    }
+    const texto = montarTextoWhatsApp(novosTimes, modalidade, novosAvisos, craquesMarcados, atrasadosMarcados);
     setTimes(novosTimes);
     setAvisos(novosAvisos);
     setUltimoTextoCopiavel(texto);
@@ -512,7 +559,7 @@ function DrawPage({ logoUrl, goTo, showToast }) {
     }, 80);
   }
 
-  function montarTextoWhatsApp(timesMontados, modalidadeAtual, avisosRestricao, craquesMarcados = craquesAplicados) {
+  function montarTextoWhatsApp(timesMontados, modalidadeAtual, avisosRestricao, craquesMarcados = craquesAplicados, atrasadosMarcados = atrasadosAplicados) {
     const modalidadeLabel = MODALIDADES.find(item => item.value === modalidadeAtual)?.label || modalidadeAtual.toUpperCase();
     const totalJogadores = timesMontados.reduce((total, time) => total + time.length, 0);
     let texto = `🏆 *RachôMetro - Sorteio dos Times*\n`;
@@ -526,9 +573,10 @@ function DrawPage({ logoUrl, goTo, showToast }) {
       time.forEach(jogador => {
         const isGoleiro = jogador.toUpperCase().includes("(GOL)");
         const craque = ehCraque(jogador, craquesMarcados);
+        const atrasado = ehAtrasado(jogador, atrasadosMarcados);
         const nome = jogador.replace(/\s*\(GOL\)/i, "").trim();
-        const prefixo = craque ? "⭐" : isGoleiro ? "🧤" : "•";
-        const detalhe = isGoleiro ? " _GOL_" : "";
+        const prefixo = atrasado ? "⏳" : craque ? "⭐" : isGoleiro ? "🧤" : "•";
+        const detalhe = `${isGoleiro ? " _GOL_" : ""}${atrasado ? " _ATRASADO_" : ""}`;
         texto += `${prefixo} ${nome}${detalhe}\n`;
       });
       texto += "\n";
@@ -623,6 +671,42 @@ function DrawPage({ logoUrl, goTo, showToast }) {
     );
   }
 
+  function toggleAtrasado(nome) {
+    setAtrasadosAplicados(prev =>
+      prev.includes(nome) ? prev.filter(item => item !== nome) : [...prev, nome]
+    );
+  }
+
+  function togglePagamento(nome) {
+    const chave = normalizarNomeJogador(nome);
+    setPagamentos(prev => ({ ...prev, [chave]: !prev[chave] }));
+  }
+
+  function formatarMoeda(valor) {
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor || 0);
+  }
+
+  function copiarRateio() {
+    if (!valorQuadraNumero || valorQuadraNumero <= 0) {
+      showToast("Informe o valor da quadra.");
+      return;
+    }
+    if (!jogadores.length) {
+      showToast("Nenhum atleta de linha para dividir.");
+      return;
+    }
+
+    const pagos = jogadores.filter(nome => pagamentos[normalizarNomeJogador(nome)]);
+    const pendentes = jogadores.filter(nome => !pagamentos[normalizarNomeJogador(nome)]);
+    let texto = `💰 *Rateio da quadra - ${APP_NAME}*\n`;
+    texto += `🏟️ Valor: *${formatarMoeda(valorQuadraNumero)}*\n`;
+    texto += `👥 Pagantes: *${jogadores.length} atletas de linha*\n`;
+    texto += `🧮 Cada um: *${formatarMoeda(valorPorJogador)}*\n\n`;
+    texto += `✅ *Pagos (${pagos.length})*\n${pagos.length ? pagos.map(nome => `• ${nome}`).join("\n") : "Ninguém ainda."}\n\n`;
+    texto += `⏳ *Falta pagar (${pendentes.length})*\n${pendentes.length ? pendentes.map(nome => `• ${nome}`).join("\n") : "Todo mundo pagou."}`;
+    copiarTexto(texto, "Rateio copiado.");
+  }
+
   function criarGrupoSeparado() {
     if (selecaoGrupo.length < 2) {
       showToast("Selecione pelo menos 2 nomes.");
@@ -651,17 +735,28 @@ function DrawPage({ logoUrl, goTo, showToast }) {
     setParesRestritos([]);
     setSelecaoGrupo([]);
     setSelecaoCraques([]);
+    setSelecaoAtrasados([]);
     setCraquesAplicados([]);
+    setAtrasadosAplicados([]);
+    setValorQuadra("");
+    setPagamentos({});
     setTimes([]);
     setAvisos([]);
     setUltimoTextoCopiavel("");
     setSecaoSepararAberta(false);
     setSecaoCorrigirAberta(false);
+    setSecaoAtrasadosAberta(false);
+    setSecaoPagamentoAberta(false);
   }
 
   function ehCraque(jogador, listaCraques = craquesAplicados) {
     const nomeNormalizado = normalizarNomeJogador(jogador);
     return listaCraques.some(nome => normalizarNomeJogador(nome) === nomeNormalizado);
+  }
+
+  function ehAtrasado(jogador, listaAtrasados = atrasadosAplicados) {
+    const nomeNormalizado = normalizarNomeJogador(jogador);
+    return listaAtrasados.some(nome => normalizarNomeJogador(nome) === nomeNormalizado);
   }
 
   async function colarLista() {
@@ -836,6 +931,62 @@ function DrawPage({ logoUrl, goTo, showToast }) {
             </>
           )}
 
+          {temNomes && (
+            <div className="compact-actions utility-actions">
+              <button className="btn-outline" type="button" onClick={() => setSecaoAtrasadosAberta(prev => !prev)}>
+                ⏳ Atrasados
+              </button>
+              <button className="btn-outline" type="button" onClick={() => setSecaoPagamentoAberta(prev => !prev)}>
+                💰 Rateio
+              </button>
+            </div>
+          )}
+
+          {secaoAtrasadosAberta && (
+            <div className="tool-box">
+              <label>Atrasados para o último time</label>
+              <p className="hint">Marque quem ainda não chegou. No sorteio, esses atletas entram no último time.</p>
+              <NameGrid nomes={jogadores} selecionados={atrasadosAplicados} onToggle={toggleAtrasado} />
+            </div>
+          )}
+
+          {secaoPagamentoAberta && (
+            <div className="tool-box payment-box">
+              <label>
+                Valor da quadra
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={valorQuadra}
+                  onChange={event => setValorQuadra(event.target.value)}
+                  placeholder="Ex: 180"
+                />
+              </label>
+              <div className="payment-summary">
+                <span>{jogadores.length} atletas</span>
+                <strong>{formatarMoeda(valorPorJogador)} cada</strong>
+                <span>{totalPago}/{jogadores.length} pagos</span>
+              </div>
+              <div className="payment-list">
+                {jogadores.length ? jogadores.map(nome => {
+                  const pago = pagamentos[normalizarNomeJogador(nome)];
+                  return (
+                    <button className={pago ? "payment-chip paid" : "payment-chip"} type="button" key={nome} onClick={() => togglePagamento(nome)}>
+                      <span>{pago ? "✓" : "○"}</span>
+                      {nome}
+                    </button>
+                  );
+                }) : <span className="hint">Goleiros não entram no rateio. Adicione atletas de linha.</span>}
+              </div>
+              <div className="compact-actions">
+                <button className="btn-outline" type="button" onClick={copiarRateio}>Copiar rateio</button>
+                <button className="btn-secondary" type="button" onClick={() => setPagamentos({})}>Limpar pagos</button>
+              </div>
+            </div>
+          )}
+
           {secaoSepararAberta && (
             <div className="tool-box">
               <label>Evitar que joguem juntos</label>
@@ -893,12 +1044,15 @@ function DrawPage({ logoUrl, goTo, showToast }) {
                   {time.map(jogador => {
                     const isGoleiro = jogador.toUpperCase().includes("(GOL)");
                     const isCraque = ehCraque(jogador);
+                    const isAtrasado = ehAtrasado(jogador);
                     return (
-                      <li className={`${isGoleiro ? "goleiro" : ""} ${isCraque ? "craque" : ""}`} key={`${index}-${jogador}`}>
+                      <li className={`${isGoleiro ? "goleiro" : ""} ${isCraque ? "craque" : ""} ${isAtrasado ? "atrasado" : ""}`} key={`${index}-${jogador}`}>
                         <span className="player-name">
                           {isCraque && <Star className="craque-star" size={15} fill="currentColor" />}
+                          {isAtrasado && <span className="late-mark" aria-label="Atrasado">⏳</span>}
                           {jogador.replace(/\s*\(GOL\)/i, "")}
                         </span>
+                        {isAtrasado && <span className="tag-late">ATR</span>}
                         {isGoleiro && <span className="tag-gol">GOL</span>}
                       </li>
                     );
@@ -935,6 +1089,8 @@ function DrawPage({ logoUrl, goTo, showToast }) {
           maxCraques={maxCraques}
           selecionados={selecaoCraques}
           setSelecionados={setSelecaoCraques}
+          atrasados={selecaoAtrasados}
+          setAtrasados={setSelecaoAtrasados}
           onSkip={() => finalizarCraques(false)}
           onApply={() => finalizarCraques(true)}
         />
@@ -1046,11 +1202,20 @@ function Tip({ icon, title, children }) {
   );
 }
 
-function CraquesModal({ jogadores, maxCraques, selecionados, setSelecionados, onSkip, onApply }) {
+function CraquesModal({ jogadores, maxCraques, selecionados, setSelecionados, atrasados, setAtrasados, onSkip, onApply }) {
   function toggle(nome) {
     setSelecionados(prev => {
       if (prev.includes(nome)) return prev.filter(item => item !== nome);
       if (prev.length >= maxCraques) return prev;
+      setAtrasados(lista => lista.filter(item => item !== nome));
+      return [...prev, nome];
+    });
+  }
+
+  function toggleAtrasadoModal(nome) {
+    setAtrasados(prev => {
+      if (prev.includes(nome)) return prev.filter(item => item !== nome);
+      setSelecionados(lista => lista.filter(item => item !== nome));
       return [...prev, nome];
     });
   }
@@ -1065,6 +1230,7 @@ function CraquesModal({ jogadores, maxCraques, selecionados, setSelecionados, on
         <p className="modal-copy">
           Selecione até {maxCraques} jogador{maxCraques === 1 ? "" : "es"}. Cada selecionado fica em um time diferente.
         </p>
+        <p className="modal-subtitle">Craques</p>
         <div className="name-grid modal-name-grid">
           {jogadores.length ? jogadores.map(nome => {
             const ativo = selecionados.includes(nome);
@@ -1081,6 +1247,23 @@ function CraquesModal({ jogadores, maxCraques, selecionados, setSelecionados, on
               </button>
             );
           }) : <span className="hint">Nenhum jogador de linha encontrado.</span>}
+        </div>
+        <p className="modal-subtitle">Atrasados para o último time</p>
+        <div className="name-grid modal-name-grid compact-name-grid">
+          {jogadores.length ? jogadores.map(nome => {
+            const ativo = atrasados.includes(nome);
+            return (
+              <button
+                className={ativo ? "name-chip selected late-chip" : "name-chip"}
+                type="button"
+                key={`late-${nome}`}
+                onClick={() => toggleAtrasadoModal(nome)}
+              >
+                {ativo && "⏳ "}
+                {nome}
+              </button>
+            );
+          }) : <span className="hint">Nenhum atleta para marcar.</span>}
         </div>
         <div className="modal-actions">
           <button className="btn-outline" type="button" onClick={onSkip}>Sortear sem separar</button>

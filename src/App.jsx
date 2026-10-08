@@ -46,19 +46,13 @@ const MODALIDADES = [
   { value: "campo", label: "CAMPO", jogadores: 11, icon: LandPlot },
   { value: "volei", label: "VOLEI", jogadores: 6, icon: Volleyball }
 ];
-
-const MODELO_LISTA = `✅ LISTA DOS CONFIRMADOS
-
-GOLEIROS
-1.
-2.
-
-ATLETAS
-1.
-2.
-3.
-4.
-5.`;
+const EMOJIS_MODALIDADE = {
+  futsal: "⚽",
+  society: "🏟️",
+  campo: "🌱",
+  volei: "🏐"
+};
+const TIMES_MODELO = 3;
 
 function routeFromHash() {
   return window.location.hash === "#/placar" ? "placar" : "sorteio";
@@ -66,6 +60,37 @@ function routeFromHash() {
 
 function navigateTo(route) {
   window.location.hash = route === "placar" ? "#/placar" : "#/";
+}
+
+function linhasNumeradas(total) {
+  return Array.from({ length: total }, (_, index) => `${index + 1}.`).join("\n");
+}
+
+function montarModeloLista(modalidadeAtual, jogadoresPorTimeAtual) {
+  const config = MODALIDADES.find(item => item.value === modalidadeAtual) || MODALIDADES[0];
+  const porTime = Math.max(1, Number(jogadoresPorTimeAtual) || config.jogadores);
+  const emoji = EMOJIS_MODALIDADE[modalidadeAtual] || "⚽";
+  const usaGoleiro = modalidadeAtual !== "volei";
+  const totalGoleiros = usaGoleiro ? TIMES_MODELO : 0;
+  const linhaPorTime = usaGoleiro ? Math.max(1, porTime - 1) : porTime;
+  const totalLinha = linhaPorTime * TIMES_MODELO;
+
+  let texto = `✅ LISTA DOS CONFIRMADOS - ${config.label}\n`;
+  texto += `${emoji} Modelo para ${TIMES_MODELO} times\n`;
+  texto += `👥 ${porTime} por time`;
+  if (usaGoleiro) texto += ` (1 GOL + ${linhaPorTime} linha)`;
+  texto += `\n\n`;
+
+  if (usaGoleiro) {
+    texto += `🧤 GOLEIROS (${totalGoleiros})\n`;
+    texto += `${linhasNumeradas(totalGoleiros)}\n\n`;
+  }
+
+  texto += `${usaGoleiro ? "🏃" : "🏐"} ATLETAS (${totalLinha})\n`;
+  texto += `${linhasNumeradas(totalLinha)}\n\n`;
+  texto += "⏳ LISTA DE ESPERA\n1.\n2.";
+
+  return texto;
 }
 
 function normalizarCabecalho(texto) {
@@ -278,7 +303,7 @@ function App() {
 
       const coreUrls = ["/", "/index.html", "/manifest.json", "/icon-192.png", "/icon-512.png", "/rachometro-logo.png"];
       caches
-        .open("rachometro-runtime-v7")
+        .open("rachometro-runtime-v8")
         .then(cache => cache.addAll([...new Set([...coreUrls, ...sameOriginResources])]))
         .catch(() => {});
     };
@@ -679,6 +704,10 @@ function DrawPage({ logoUrl, goTo, showToast }) {
     showToast("Sorteie os times primeiro.");
   }
 
+  function copiarModeloLista() {
+    copiarTexto(montarModeloLista(modalidade, jogadoresPorTime), "Modelo copiado.");
+  }
+
   return (
     <div className="app-shell draw-shell">
       <header className="app-topbar">
@@ -766,7 +795,7 @@ function DrawPage({ logoUrl, goTo, showToast }) {
                 </div>
               </label>
               <div className="secondary-actions">
-                <button className="btn-outline" type="button" onClick={() => copiarTexto(MODELO_LISTA, "Modelo copiado.")}>
+                <button className="btn-outline" type="button" onClick={copiarModeloLista}>
                   <ClipboardList size={18} />
                   Modelo
                 </button>
@@ -897,7 +926,7 @@ function DrawPage({ logoUrl, goTo, showToast }) {
       </div>
 
       {modalGuiaAberto && (
-        <GuideModal onClose={() => setModalGuiaAberto(false)} onCopyModel={() => copiarTexto(MODELO_LISTA, "Modelo copiado.")} />
+        <GuideModal onClose={() => setModalGuiaAberto(false)} onCopyModel={copiarModeloLista} />
       )}
 
       {modalCraquesAberto && (
@@ -993,7 +1022,7 @@ function GuideModal({ onClose, onCopyModel }) {
         <div className="modal-grid">
           <Tip icon={<ClipboardCheck />} title="Lista">Cole a mensagem e use Processar na barra fixa de baixo.</Tip>
           <Tip icon={<Tag />} title="Cabeçalhos aceitos">Use GOLEIROS, GOL, ATLETAS ou LINHA.</Tip>
-          <Tip icon={<List />} title="Modelo">Copie o modelo para evitar erro de cabecalho no grupo.</Tip>
+          <Tip icon={<List />} title="Modelo">Copia um modelo com a quantidade certa para a modalidade selecionada.</Tip>
           <Tip icon={<RotateCcw />} title="Goleiro por time">Se faltar goleiro, o app repete em rodízio.</Tip>
         </div>
         <div className="modal-actions">
@@ -1281,7 +1310,7 @@ function ScorePage({ logoUrl, goTo, showToast }) {
       <main className="match-layout">
         <section className="match-panel timer-panel">
           <div className="section-row tight-row">
-            <p className="section-title">{mode === "chrono" ? "Cronômetro do racha" : "Timer da partida"}</p>
+            <p className="section-title">{mode === "chrono" ? "Cronômetro" : "Timer da partida"}</p>
           </div>
 
           <div className="segmented">

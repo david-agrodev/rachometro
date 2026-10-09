@@ -1486,6 +1486,15 @@ body.light-theme .modal-box {
   max-height: 24dvh;
 }
 
+.model-form {
+  display: grid;
+  gap: 10px;
+}
+
+.model-form textarea {
+  min-height: 96px;
+}
+
 .modal-actions {
   display: grid;
   gap: 10px;

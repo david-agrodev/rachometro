@@ -6,6 +6,8 @@ import {
   ClipboardList,
   Dribbble,
   Goal,
+  HandCoins,
+  Hourglass,
   Info,
   LandPlot,
   List,
@@ -66,7 +68,7 @@ function linhasNumeradas(total) {
   return Array.from({ length: total }, (_, index) => `${index + 1}.`).join("\n");
 }
 
-function montarModeloLista(modalidadeAtual, jogadoresPorTimeAtual) {
+function montarModeloLista(modalidadeAtual, jogadoresPorTimeAtual, info = {}) {
   const config = MODALIDADES.find(item => item.value === modalidadeAtual) || MODALIDADES[0];
   const porTime = Math.max(1, Number(jogadoresPorTimeAtual) || config.jogadores);
   const emoji = EMOJIS_MODALIDADE[modalidadeAtual] || "⚽";
@@ -76,17 +78,20 @@ function montarModeloLista(modalidadeAtual, jogadoresPorTimeAtual) {
   const totalLinha = linhaPorTime * TIMES_MODELO;
 
   let texto = `✅ LISTA DOS CONFIRMADOS - ${config.label}\n`;
-  texto += `${emoji} Modelo para ${TIMES_MODELO} times\n`;
-  texto += `👥 ${porTime} por time`;
-  if (usaGoleiro) texto += ` (1 GOL + ${linhaPorTime} linha)`;
-  texto += `\n\n`;
+  texto += `${emoji} ${info.quadra?.trim() || "Racha confirmado"}\n`;
+  if (info.dataHora?.trim()) texto += `🗓️ Quando: ${info.dataHora.trim()}\n`;
+  if (info.endereco?.trim()) texto += `📍 Endereço: ${info.endereco.trim()}\n`;
+  if (info.valor?.trim()) texto += `💰 Valor: ${info.valor.trim()}\n`;
+  if (info.pix?.trim()) texto += `🔑 Pix: ${info.pix.trim()}\n`;
+  if (info.observacoes?.trim()) texto += `📝 Obs: ${info.observacoes.trim()}\n`;
+  texto += "\n";
 
   if (usaGoleiro) {
-    texto += `🧤 GOLEIROS (${totalGoleiros})\n`;
+    texto += "🧤 GOLEIROS\n";
     texto += `${linhasNumeradas(totalGoleiros)}\n\n`;
   }
 
-  texto += `${usaGoleiro ? "🏃" : "🏐"} ATLETAS (${totalLinha})\n`;
+  texto += `${usaGoleiro ? "🏃" : "🏐"} ATLETAS\n`;
   texto += `${linhasNumeradas(totalLinha)}\n\n`;
   texto += "⏳ LISTA DE ESPERA\n1.\n2.";
 
@@ -226,6 +231,25 @@ function usePersistentNumber(key, initialValue) {
   return [value, setValue];
 }
 
+function usePersistentState(key, initialValue) {
+  const [value, setValue] = useState(() => {
+    try {
+      const saved = localStorage.getItem(key);
+      return saved ? JSON.parse(saved) : initialValue;
+    } catch {
+      return initialValue;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {}
+  }, [key, value]);
+
+  return [value, setValue];
+}
+
 function App() {
   const [route, setRoute] = useState(routeFromHash);
   const [toast, setToast] = useState("");
@@ -303,7 +327,7 @@ function App() {
 
       const coreUrls = ["/", "/index.html", "/manifest.json", "/icon-192.png", "/icon-512.png", "/rachometro-logo.png"];
       caches
-        .open("rachometro-runtime-v9")
+        .open("rachometro-runtime-v10")
         .then(cache => cache.addAll([...new Set([...coreUrls, ...sameOriginResources])]))
         .catch(() => {});
     };
@@ -338,16 +362,17 @@ function App() {
 function DrawPage({ logoUrl, goTo, showToast }) {
   const [modalGuiaAberto, setModalGuiaAberto] = useState(false);
   const [modalCraquesAberto, setModalCraquesAberto] = useState(false);
-  const [modalidade, setModalidade] = useState("futsal");
-  const [jogadoresPorTime, setJogadoresPorTime] = useState(5);
-  const [modoEntrada, setModoEntrada] = useState("lista");
-  const [textoBruto, setTextoBruto] = useState("");
+  const [modalModeloAberto, setModalModeloAberto] = useState(false);
+  const [modalidade, setModalidade] = usePersistentState("drawModalidade", "futsal");
+  const [jogadoresPorTime, setJogadoresPorTime] = usePersistentState("drawJogadoresPorTime", 5);
+  const [modoEntrada, setModoEntrada] = usePersistentState("drawModoEntrada", "lista");
+  const [textoBruto, setTextoBruto] = usePersistentState("drawTextoBruto", "");
   const [manualNome, setManualNome] = useState("");
   const [corrigeNome, setCorrigeNome] = useState("");
   const [selectMoverNome, setSelectMoverNome] = useState("");
-  const [goleiros, setGoleiros] = useState([]);
-  const [jogadores, setJogadores] = useState([]);
-  const [paresRestritos, setParesRestritos] = useState([]);
+  const [goleiros, setGoleiros] = usePersistentState("drawGoleiros", []);
+  const [jogadores, setJogadores] = usePersistentState("drawJogadores", []);
+  const [paresRestritos, setParesRestritos] = usePersistentState("drawParesRestritos", []);
   const [selecaoGrupo, setSelecaoGrupo] = useState([]);
   const [selecaoCraques, setSelecaoCraques] = useState([]);
   const [selecaoAtrasados, setSelecaoAtrasados] = useState([]);
@@ -359,10 +384,18 @@ function DrawPage({ logoUrl, goTo, showToast }) {
   const [avisos, setAvisos] = useState([]);
   const [ultimoTextoCopiavel, setUltimoTextoCopiavel] = useState("");
   const [sorteando, setSorteando] = useState(false);
-  const [craquesAplicados, setCraquesAplicados] = useState([]);
-  const [atrasadosAplicados, setAtrasadosAplicados] = useState([]);
-  const [valorQuadra, setValorQuadra] = useState("");
-  const [pagamentos, setPagamentos] = useState({});
+  const [craquesAplicados, setCraquesAplicados] = usePersistentState("drawCraquesAplicados", []);
+  const [atrasadosAplicados, setAtrasadosAplicados] = usePersistentState("drawAtrasadosAplicados", []);
+  const [valorQuadra, setValorQuadra] = usePersistentState("drawValorQuadra", "");
+  const [pagamentos, setPagamentos] = usePersistentState("drawPagamentos", {});
+  const [modeloInfo, setModeloInfo] = usePersistentState("drawModeloInfo", {
+    quadra: "",
+    endereco: "",
+    pix: "",
+    valor: "",
+    dataHora: "",
+    observacoes: ""
+  });
   const suspenseTimer = useRef(null);
   const resultadosRef = useRef(null);
 
@@ -799,8 +832,13 @@ function DrawPage({ logoUrl, goTo, showToast }) {
     showToast("Sorteie os times primeiro.");
   }
 
+  function atualizarModeloInfo(campo, valor) {
+    setModeloInfo(prev => ({ ...prev, [campo]: valor }));
+  }
+
   function copiarModeloLista() {
-    copiarTexto(montarModeloLista(modalidade, jogadoresPorTime), "Modelo copiado.");
+    copiarTexto(montarModeloLista(modalidade, jogadoresPorTime, modeloInfo), "Modelo copiado.");
+    setModalModeloAberto(false);
   }
 
   return (
@@ -815,7 +853,7 @@ function DrawPage({ logoUrl, goTo, showToast }) {
         </div>
         <button className="icon-action" type="button" onClick={() => goTo("placar")}>
           <Timer size={18} />
-          <span>Placar</span>
+          <span>Cronômetro</span>
         </button>
       </header>
 
@@ -890,7 +928,7 @@ function DrawPage({ logoUrl, goTo, showToast }) {
                 </div>
               </label>
               <div className="secondary-actions">
-                <button className="btn-outline" type="button" onClick={copiarModeloLista}>
+                <button className="btn-outline" type="button" onClick={() => setModalModeloAberto(true)}>
                   <ClipboardList size={18} />
                   Modelo
                 </button>
@@ -934,10 +972,12 @@ function DrawPage({ logoUrl, goTo, showToast }) {
           {temNomes && (
             <div className="compact-actions utility-actions">
               <button className="btn-outline" type="button" onClick={() => setSecaoAtrasadosAberta(prev => !prev)}>
-                ⏳ Atrasados
+                <Hourglass size={18} />
+                Atrasados
               </button>
               <button className="btn-outline" type="button" onClick={() => setSecaoPagamentoAberta(prev => !prev)}>
-                💰 Rateio
+                <HandCoins size={18} />
+                Rateio
               </button>
             </div>
           )}
@@ -1080,7 +1120,16 @@ function DrawPage({ logoUrl, goTo, showToast }) {
       </div>
 
       {modalGuiaAberto && (
-        <GuideModal onClose={() => setModalGuiaAberto(false)} onCopyModel={copiarModeloLista} />
+        <GuideModal onClose={() => setModalGuiaAberto(false)} onCopyModel={() => setModalModeloAberto(true)} />
+      )}
+
+      {modalModeloAberto && (
+        <ModeloListaModal
+          info={modeloInfo}
+          onChange={atualizarModeloInfo}
+          onClose={() => setModalModeloAberto(false)}
+          onCopy={copiarModeloLista}
+        />
       )}
 
       {modalCraquesAberto && (
@@ -1197,6 +1246,55 @@ function Tip({ icon, title, children }) {
       <div>
         <strong>{title}</strong>
         {children}
+      </div>
+    </div>
+  );
+}
+
+function ModeloListaModal({ info, onChange, onClose, onCopy }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={event => event.stopPropagation()}>
+        <button className="modal-close" type="button" onClick={onClose} aria-label="Fechar modelo">
+          <X size={18} />
+        </button>
+        <div className="modal-head">
+          <div className="modal-chip"><ClipboardList size={16} /> Modelo da lista</div>
+          <h2>Dados do convite</h2>
+        </div>
+        <p className="modal-copy">
+          Preencha só o que quiser. Esses dados ficam salvos no app para os próximos rachas.
+        </p>
+        <div className="model-form">
+          <label>
+            Nome da quadra
+            <input value={info.quadra} onChange={event => onChange("quadra", event.target.value)} placeholder="Ex: Arena Goleio" />
+          </label>
+          <label>
+            Data e horário
+            <input value={info.dataHora} onChange={event => onChange("dataHora", event.target.value)} placeholder="Ex: Hoje às 20h" />
+          </label>
+          <label>
+            Endereço
+            <input value={info.endereco} onChange={event => onChange("endereco", event.target.value)} placeholder="Rua, número, bairro" />
+          </label>
+          <label>
+            Valor
+            <input value={info.valor} onChange={event => onChange("valor", event.target.value)} placeholder="Ex: R$ 180,00 total ou R$ 20 por pessoa" />
+          </label>
+          <label>
+            Pix
+            <input value={info.pix} onChange={event => onChange("pix", event.target.value)} placeholder="Chave Pix para pagamento" />
+          </label>
+          <label>
+            Observações
+            <textarea value={info.observacoes} onChange={event => onChange("observacoes", event.target.value)} placeholder="Ex: Chegar 10 min antes. Levar camisa clara e escura." />
+          </label>
+        </div>
+        <div className="modal-actions">
+          <button className="btn-outline" type="button" onClick={onClose}>Cancelar</button>
+          <button type="button" onClick={onCopy}><Clipboard size={18} /> Copiar modelo</button>
+        </div>
       </div>
     </div>
   );
@@ -1474,7 +1572,7 @@ function ScorePage({ logoUrl, goTo, showToast }) {
           <img className="brand-logo" src={logoUrl} alt={APP_NAME} />
           <div>
             <span className="app-kicker">{APP_NAME}</span>
-            <h1>Cronômetro & Placar</h1>
+            <h1>Cronômetro</h1>
           </div>
         </div>
         <button className="icon-action theme-action" type="button" onClick={() => setTheme(theme === "light" ? "dark" : "light")}>

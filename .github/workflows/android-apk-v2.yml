@@ -1,0 +1,247 @@
+name: Gerar APK Android v2
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch ou tag para gerar o APK'
+        required: false
+        default: 'main'
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk-v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências web
+        run: npm ci
+
+      - name: Instalar dependências Android temporárias
+        run: |
+          npm install --no-save @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 @capacitor/clipboard@7 @capacitor/splash-screen@7
+          python -m pip install --upgrade pip pillow
+
+      - name: Ajustar copiar e colar no Android nativo
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          path = Path('src/App.jsx')
+          text = path.read_text(encoding='utf-8')
+
+          original_copy = '''  async function copiarTexto(texto, sucesso) {
+    try {
+      await navigator.clipboard.writeText(texto);
+      showToast(sucesso);
+    } catch {
+      showToast("Não foi possível copiar. Verifique as permissões do navegador.");
+    }
+  }
+'''
+          replacement_copy = '''  async function copiarTexto(texto, sucesso) {
+    try {
+      if (window.Capacitor?.isNativePlatform?.()) {
+        const { Clipboard } = await import("@capacitor/clipboard");
+        await Clipboard.write({ string: texto });
+      } else {
+        await navigator.clipboard.writeText(texto);
+      }
+      showToast(sucesso);
+    } catch {
+      showToast("Não foi possível copiar. Verifique as permissões do navegador.");
+    }
+  }
+'''
+          if original_copy not in text:
+            raise SystemExit('Trecho copiarTexto não encontrado.')
+          text = text.replace(original_copy, replacement_copy, 1)
+
+          original_paste = '''  async function colarLista() {
+    try {
+      const clip = await navigator.clipboard.readText();
+      if (!clip) {
+        showToast("Área de transferência vazia.");
+        return;
+      }
+      setTextoBruto(clip);
+      showToast("Lista colada.");
+    } catch {
+      showToast("Não foi possível colar.");
+    }
+  }
+'''
+          replacement_paste = '''  async function colarLista() {
+    try {
+      let clip = "";
+      if (window.Capacitor?.isNativePlatform?.()) {
+        const { Clipboard } = await import("@capacitor/clipboard");
+        const result = await Clipboard.read();
+        clip = result?.value || result?.string || "";
+      } else {
+        clip = await navigator.clipboard.readText();
+      }
+      if (!clip) {
+        showToast("Área de transferência vazia.");
+        return;
+      }
+      setTextoBruto(clip);
+      showToast("Lista colada.");
+    } catch {
+      showToast("Não foi possível colar.");
+    }
+  }
+'''
+          if original_paste not in text:
+            raise SystemExit('Trecho colarLista não encontrado.')
+          text = text.replace(original_paste, replacement_paste, 1)
+
+          path.write_text(text, encoding='utf-8')
+          print('Clipboard Android ajustado com sucesso.')
+          PY
+
+      - name: Compilar React
+        run: npm run build
+
+      - name: Criar configuração Capacitor
+        run: |
+          cat > capacitor.config.json <<'JSON'
+          {
+            "appId": "com.rachometro.app",
+            "appName": "RachôMetro",
+            "webDir": "dist",
+            "plugins": {
+              "SplashScreen": {
+                "launchShowDuration": 1200,
+                "backgroundColor": "#061813",
+                "showSpinner": false,
+                "androidScaleType": "CENTER_CROP",
+                "splashFullScreen": true,
+                "splashImmersive": true
+              }
+            }
+          }
+          JSON
+
+      - name: Criar projeto Android
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: Personalizar ícone e splash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageOps, ImageDraw
+          import xml.etree.ElementTree as ET
+
+          root = Path('.')
+          android = root / 'android' / 'app' / 'src' / 'main' / 'res'
+          source = root / 'public' / 'rachometro-logo.png'
+          if not source.exists():
+              raise SystemExit('Logo não encontrada em public/rachometro-logo.png')
+
+          img = Image.open(source).convert('RGBA')
+          square = ImageOps.contain(img, (768, 768))
+          canvas = Image.new('RGBA', (768, 768), '#061813')
+          x = (768 - square.width) // 2
+          y = (768 - square.height) // 2
+          canvas.paste(square, (x, y), square)
+
+          # launcher icons
+          sizes = {
+              'mipmap-mdpi': 48,
+              'mipmap-hdpi': 72,
+              'mipmap-xhdpi': 96,
+              'mipmap-xxhdpi': 144,
+              'mipmap-xxxhdpi': 192,
+          }
+          for folder, size in sizes.items():
+              d = android / folder
+              d.mkdir(parents=True, exist_ok=True)
+              icon = canvas.resize((size, size), Image.LANCZOS)
+              icon.save(d / 'ic_launcher.png')
+              icon.save(d / 'ic_launcher_round.png')
+
+          # splash image in drawable folders
+          splash_sizes = {
+              'drawable': (320, 320),
+              'drawable-port-mdpi': (200, 200),
+              'drawable-port-hdpi': (300, 300),
+              'drawable-port-xhdpi': (400, 400),
+              'drawable-port-xxhdpi': (600, 600),
+              'drawable-port-xxxhdpi': (800, 800),
+          }
+          for folder, size in splash_sizes.items():
+              d = android / folder
+              d.mkdir(parents=True, exist_ok=True)
+              splash_canvas = Image.new('RGBA', size, '#061813')
+              inner = ImageOps.contain(img, (int(size[0]*0.66), int(size[1]*0.66)))
+              xx = (size[0] - inner.width) // 2
+              yy = (size[1] - inner.height) // 2
+              splash_canvas.paste(inner, (xx, yy), inner)
+              splash_canvas.save(d / 'splash.png')
+
+          # update app name
+          strings = android / 'values' / 'strings.xml'
+          if strings.exists():
+              txt = strings.read_text(encoding='utf-8')
+              txt = txt.replace('app_name">App</string>', 'app_name">RachôMetro</string>')
+              txt = txt.replace('app_name">android</string>', 'app_name">RachôMetro</string>')
+              strings.write_text(txt, encoding='utf-8')
+
+          # tweak splash background in themes
+          for rel in ['values/styles.xml', 'values-v31/styles.xml']:
+              p = android / rel
+              if not p.exists():
+                  continue
+              txt = p.read_text(encoding='utf-8')
+              txt = txt.replace('#ffffffff', '#061813ff')
+              txt = txt.replace('@color/white', '#061813')
+              txt = txt.replace('@drawable/splash', '@drawable/splash')
+              if 'windowSplashScreenBackground' in txt and '#061813' not in txt:
+                  txt = txt.replace('windowSplashScreenBackground">@android:color/white', 'windowSplashScreenBackground">#061813')
+              p.write_text(txt, encoding='utf-8')
+
+          print('Ícones e splash personalizados com sucesso.')
+          PY
+
+      - name: Sincronizar Android final
+        run: npx cap sync android
+
+      - name: Gerar APK v2
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Disponibilizar APK v2 para download
+        uses: actions/upload-artifact@v4
+        with:
+          name: rachometro-v2-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7

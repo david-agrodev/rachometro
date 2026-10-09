@@ -164,21 +164,56 @@ textarea:focus {
 }
 
 .splash-logo-wrap {
+  position: relative;
   display: grid;
   place-items: center;
   width: 172px;
   height: 172px;
-  border: 1px solid rgba(121, 242, 177, 0.2);
-  border-radius: 34px;
-  background: rgba(18, 33, 29, 0.74);
+  border: 1px solid rgba(121, 242, 177, 0.22);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(48, 226, 130, 0.16), transparent 56%),
+    rgba(18, 33, 29, 0.5);
   box-shadow: 0 28px 70px rgba(0, 0, 0, 0.42);
-  overflow: hidden;
 }
 
-.splash-animation {
-  width: 138px;
-  height: 138px;
+.splash-brand-mark {
+  position: relative;
+  z-index: 2;
+  width: 88px;
+  height: 88px;
+  border: 1px solid rgba(121, 242, 177, 0.28);
+  border-radius: 22px;
   object-fit: contain;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.34);
+  animation: splashLogoPulse 1.7s ease-in-out infinite;
+}
+
+.splash-orbit {
+  position: absolute;
+  inset: 12px;
+  border: 1px dashed rgba(121, 242, 177, 0.36);
+  border-radius: 50%;
+  animation: orbitSpin 2.5s linear infinite;
+}
+
+.splash-ball {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  z-index: 3;
+  width: 26px;
+  height: 26px;
+  border: 2px solid #06140e;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, #06140e 0 18%, transparent 19%),
+    linear-gradient(45deg, transparent 43%, #06140e 44% 48%, transparent 49%),
+    linear-gradient(-45deg, transparent 43%, #06140e 44% 48%, transparent 49%),
+    #f5fbf7;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.28);
+  transform-origin: 0 68px;
+  animation: splashBallOrbit 1.45s linear infinite;
 }
 
 .splash-content h1 {
@@ -212,6 +247,25 @@ textarea:focus {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes splashLogoPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes splashBallOrbit {
+  from {
+    transform: rotate(0deg) translateX(-50%) rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg) translateX(-50%) rotate(-360deg);
   }
 }
 

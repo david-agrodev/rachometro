@@ -1,4 +1,4 @@
-const CACHE_NAME = "rachometro-v12";
+const CACHE_NAME = "rachometro-v13";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -9,8 +9,7 @@ const APP_SHELL = [
   "/apple-touch-icon-180.png",
   "/icon-192.png",
   "/icon-512.png",
-  "/rachometro-logo.png",
-  "/splash-soccer.gif"
+  "/rachometro-logo.png"
 ];
 
 self.addEventListener("install", event => {

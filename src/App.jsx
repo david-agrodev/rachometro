@@ -469,9 +469,9 @@ function App() {
         .filter(url => url.startsWith(window.location.origin))
         .filter(url => /\.(js|css|png|jpg|jpeg|webp|svg|ico)$/i.test(url));
 
-      const coreUrls = ["/", "/index.html", "/manifest.json", "/icon-192.png", "/icon-512.png", "/rachometro-logo.png", "/splash-soccer.gif"];
+      const coreUrls = ["/", "/index.html", "/manifest.json", "/icon-192.png", "/icon-512.png", "/rachometro-logo.png"];
       caches
-        .open("rachometro-runtime-v12")
+        .open("rachometro-runtime-v13")
         .then(cache => cache.addAll([...new Set([...coreUrls, ...sameOriginResources])]))
         .catch(() => {});
     };
@@ -512,7 +512,9 @@ function SplashScreen({ onSkip }) {
     <div className="splash-screen" role="status" aria-live="polite" onClick={onSkip}>
       <div className="splash-content">
         <div className="splash-logo-wrap">
-          <img className="splash-animation" src="/splash-soccer.gif" alt="" />
+          <span className="splash-orbit" />
+          <span className="splash-ball" />
+          <img className="splash-brand-mark" src={logoUrl} alt="" />
         </div>
         <div>
           <span className="app-kicker">{APP_NAME}</span>

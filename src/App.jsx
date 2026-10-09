@@ -131,6 +131,30 @@ function normalizarNomeJogador(nome) {
     .toLowerCase();
 }
 
+function identificarNomesDuplicados(nomes) {
+  const vistos = new Set();
+  const repetidos = new Set();
+  for (const nome of nomes) {
+    const chave = normalizarNomeJogador(nome).replace(/\s+/g, " ");
+    if (!chave) continue;
+    if (vistos.has(chave)) repetidos.add(nome.trim());
+    else vistos.add(chave);
+  }
+  return [...repetidos];
+}
+
+function avisarNomesDuplicados(nomes) {
+  const duplicados = identificarNomesDuplicados(nomes);
+  if (!duplicados.length) return false;
+  window.alert(
+    "Existem jogadores com nomes iguais!\n\n" +
+    "Diferencie os nomes antes de continuar:\n\n" +
+    duplicados.join("\n") +
+    "\n\nExemplo: Gabriel Silva e Gabriel Souza."
+  );
+  return true;
+}
+
 function embaralhar(array) {
   const copia = [...array];
   let currentIndex = copia.length;
@@ -483,6 +507,8 @@ function DrawPage({ logoUrl, goTo, showToast }) {
       if (secao === "jogadores") novosJogadores.push(nomeLimpo);
     }
 
+    if (avisarNomesDuplicados([...novosGoleiros, ...novosJogadores])) return;
+
     setGoleiros(novosGoleiros);
     setJogadores(novosJogadores);
     setParesRestritos([]);
@@ -513,6 +539,7 @@ function DrawPage({ logoUrl, goTo, showToast }) {
 
   function sortearTimes(gruposForcados, craquesForcados = craquesAplicados, atrasadosForcados = atrasadosAplicados) {
     if (sorteando) return;
+    if (avisarNomesDuplicados([...goleiros, ...jogadores])) return;
     const gruposRestritos = Array.isArray(gruposForcados) ? gruposForcados : paresRestritos;
 
     const porTime = Number(jogadoresPorTime);
@@ -663,6 +690,8 @@ function DrawPage({ logoUrl, goTo, showToast }) {
       showToast("Digite um nome para adicionar.");
       return;
     }
+
+    if (avisarNomesDuplicados([...goleiros, ...jogadores, nome])) return;
 
     if (tipo === "goleiro") setGoleiros(prev => [...prev, nome]);
     else setJogadores(prev => [...prev, nome]);

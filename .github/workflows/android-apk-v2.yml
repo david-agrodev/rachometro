@@ -54,67 +54,67 @@ jobs:
           text = path.read_text(encoding='utf-8')
 
           original_copy = '''  async function copiarTexto(texto, sucesso) {
-    try {
-      await navigator.clipboard.writeText(texto);
-      showToast(sucesso);
-    } catch {
-      showToast("Não foi possível copiar. Verifique as permissões do navegador.");
-    }
-  }
-'''
+              try {
+                await navigator.clipboard.writeText(texto);
+                showToast(sucesso);
+              } catch {
+                showToast("Não foi possível copiar. Verifique as permissões do navegador.");
+              }
+            }
+          '''
           replacement_copy = '''  async function copiarTexto(texto, sucesso) {
-    try {
-      if (window.Capacitor?.isNativePlatform?.()) {
-        const { Clipboard } = await import("@capacitor/clipboard");
-        await Clipboard.write({ string: texto });
-      } else {
-        await navigator.clipboard.writeText(texto);
-      }
-      showToast(sucesso);
-    } catch {
-      showToast("Não foi possível copiar. Verifique as permissões do navegador.");
-    }
-  }
-'''
+              try {
+                if (window.Capacitor?.isNativePlatform?.()) {
+                  const { Clipboard } = await import("@capacitor/clipboard");
+                  await Clipboard.write({ string: texto });
+                } else {
+                  await navigator.clipboard.writeText(texto);
+                }
+                showToast(sucesso);
+              } catch {
+                showToast("Não foi possível copiar. Verifique as permissões do navegador.");
+              }
+            }
+          '''
           if original_copy not in text:
             raise SystemExit('Trecho copiarTexto não encontrado.')
           text = text.replace(original_copy, replacement_copy, 1)
 
           original_paste = '''  async function colarLista() {
-    try {
-      const clip = await navigator.clipboard.readText();
-      if (!clip) {
-        showToast("Área de transferência vazia.");
-        return;
-      }
-      setTextoBruto(clip);
-      showToast("Lista colada.");
-    } catch {
-      showToast("Não foi possível colar.");
-    }
-  }
-'''
+              try {
+                const clip = await navigator.clipboard.readText();
+                if (!clip) {
+                  showToast("Área de transferência vazia.");
+                  return;
+                }
+                setTextoBruto(clip);
+                showToast("Lista colada.");
+              } catch {
+                showToast("Não foi possível colar.");
+              }
+            }
+          '''
           replacement_paste = '''  async function colarLista() {
-    try {
-      let clip = "";
-      if (window.Capacitor?.isNativePlatform?.()) {
-        const { Clipboard } = await import("@capacitor/clipboard");
-        const result = await Clipboard.read();
-        clip = result?.value || result?.string || "";
-      } else {
-        clip = await navigator.clipboard.readText();
-      }
-      if (!clip) {
-        showToast("Área de transferência vazia.");
-        return;
-      }
-      setTextoBruto(clip);
-      showToast("Lista colada.");
-    } catch {
-      showToast("Não foi possível colar.");
-    }
-  }
-'''
+              try {
+                let clip = "";
+                if (window.Capacitor?.isNativePlatform?.()) {
+                  const { Clipboard } = await import("@capacitor/clipboard");
+                  const result = await Clipboard.read();
+                  clip = result?.value || result?.string || "";
+                } else {
+                  clip = await navigator.clipboard.readText();
+                }
+                if (!clip) {
+                  showToast("Área de transferência vazia.");
+                  return;
+                }
+                setTextoBruto(clip);
+                showToast("Lista colada.");
+              } catch {
+                showToast("Não foi possível colar.");
+              }
+            }
+          '''
           if original_paste not in text:
             raise SystemExit('Trecho colarLista não encontrado.')
           text = text.replace(original_paste, replacement_paste, 1)

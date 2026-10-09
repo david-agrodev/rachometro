@@ -146,12 +146,122 @@ function identificarNomesDuplicados(nomes) {
 function avisarNomesDuplicados(nomes) {
   const duplicados = identificarNomesDuplicados(nomes);
   if (!duplicados.length) return false;
-  window.alert(
-    "Existem jogadores com nomes iguais!\n\n" +
-    "Diferencie os nomes antes de continuar:\n\n" +
-    duplicados.join("\n") +
-    "\n\nExemplo: Gabriel Silva e Gabriel Souza."
-  );
+
+  const anterior = document.getElementById("rachometro-duplicados-overlay");
+  if (anterior) anterior.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "rachometro-duplicados-overlay";
+  overlay.style.position = "fixed";
+  overlay.style.inset = "0";
+  overlay.style.zIndex = "99999";
+  overlay.style.display = "flex";
+  overlay.style.alignItems = "center";
+  overlay.style.justifyContent = "center";
+  overlay.style.padding = "20px";
+  overlay.style.background = "rgba(3, 10, 8, 0.82)";
+  overlay.style.backdropFilter = "blur(6px)";
+
+  const card = document.createElement("div");
+  card.style.width = "100%";
+  card.style.maxWidth = "520px";
+  card.style.borderRadius = "24px";
+  card.style.padding = "24px";
+  card.style.color = "#f3fff8";
+  card.style.background = "linear-gradient(180deg, #0b211c 0%, #071612 100%)";
+  card.style.border = "1px solid rgba(64, 214, 137, 0.35)";
+  card.style.boxShadow = "0 24px 60px rgba(0, 0, 0, 0.45)";
+  card.style.fontFamily = "Inter, system-ui, sans-serif";
+
+  const badge = document.createElement("div");
+  badge.textContent = "RACHÔMETRO";
+  badge.style.display = "inline-flex";
+  badge.style.marginBottom = "10px";
+  badge.style.padding = "6px 10px";
+  badge.style.borderRadius = "999px";
+  badge.style.fontSize = "12px";
+  badge.style.fontWeight = "800";
+  badge.style.letterSpacing = "0.08em";
+  badge.style.color = "#67f0a8";
+  badge.style.background = "rgba(29, 87, 63, 0.45)";
+  badge.style.border = "1px solid rgba(64, 214, 137, 0.22)";
+
+  const title = document.createElement("h3");
+  title.textContent = "Nomes duplicados encontrados";
+  title.style.margin = "0 0 10px";
+  title.style.fontSize = "26px";
+  title.style.lineHeight = "1.1";
+
+  const intro = document.createElement("p");
+  intro.textContent = "Para evitar erros com craques, atrasados e sorteio, diferencie estes nomes antes de continuar:";
+  intro.style.margin = "0 0 18px";
+  intro.style.fontSize = "15px";
+  intro.style.lineHeight = "1.55";
+  intro.style.color = "rgba(236, 255, 244, 0.88)";
+
+  const list = document.createElement("div");
+  list.style.display = "flex";
+  list.style.flexWrap = "wrap";
+  list.style.gap = "10px";
+  list.style.marginBottom = "18px";
+
+  duplicados.forEach((nome) => {
+    const item = document.createElement("span");
+    item.textContent = nome;
+    item.style.display = "inline-flex";
+    item.style.alignItems = "center";
+    item.style.padding = "10px 14px";
+    item.style.borderRadius = "14px";
+    item.style.fontWeight = "700";
+    item.style.color = "#eafff2";
+    item.style.background = "rgba(13, 62, 44, 0.92)";
+    item.style.border = "1px solid rgba(64, 214, 137, 0.28)";
+    list.appendChild(item);
+  });
+
+  const hint = document.createElement("div");
+  hint.textContent = "Exemplo: Gabriel Silva e Gabriel Souza.";
+  hint.style.marginBottom = "22px";
+  hint.style.padding = "12px 14px";
+  hint.style.borderRadius = "14px";
+  hint.style.fontSize = "14px";
+  hint.style.color = "#bfffd7";
+  hint.style.background = "rgba(17, 53, 40, 0.88)";
+  hint.style.border = "1px solid rgba(64, 214, 137, 0.15)";
+
+  const footer = document.createElement("div");
+  footer.style.display = "flex";
+  footer.style.justifyContent = "flex-end";
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = "Entendi";
+  button.style.border = "none";
+  button.style.borderRadius = "14px";
+  button.style.padding = "12px 18px";
+  button.style.fontSize = "15px";
+  button.style.fontWeight = "800";
+  button.style.cursor = "pointer";
+  button.style.color = "#062015";
+  button.style.background = "linear-gradient(180deg, #6cf2aa 0%, #2cd37b 100%)";
+  button.style.boxShadow = "0 12px 26px rgba(44, 211, 123, 0.28)";
+
+  const fechar = () => overlay.remove();
+  button.addEventListener("click", fechar);
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) fechar();
+  });
+
+  footer.appendChild(button);
+  card.appendChild(badge);
+  card.appendChild(title);
+  card.appendChild(intro);
+  card.appendChild(list);
+  card.appendChild(hint);
+  card.appendChild(footer);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+
   return true;
 }
 

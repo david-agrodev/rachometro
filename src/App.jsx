@@ -387,6 +387,7 @@ function usePersistentState(key, initialValue) {
 function App() {
   const [route, setRoute] = useState(routeFromHash);
   const [toast, setToast] = useState("");
+  const [showSplash, setShowSplash] = useState(() => !sessionStorage.getItem("splashSeen"));
   const toastTimer = useRef(null);
 
   useEffect(() => {
@@ -394,6 +395,15 @@ function App() {
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
+
+  useEffect(() => {
+    if (!showSplash) return undefined;
+    const id = window.setTimeout(() => {
+      sessionStorage.setItem("splashSeen", "true");
+      setShowSplash(false);
+    }, 2400);
+    return () => window.clearTimeout(id);
+  }, [showSplash]);
 
   useEffect(() => {
     if (import.meta.env.PROD && "serviceWorker" in navigator) {
@@ -459,9 +469,9 @@ function App() {
         .filter(url => url.startsWith(window.location.origin))
         .filter(url => /\.(js|css|png|jpg|jpeg|webp|svg|ico)$/i.test(url));
 
-      const coreUrls = ["/", "/index.html", "/manifest.json", "/icon-192.png", "/icon-512.png", "/rachometro-logo.png"];
+      const coreUrls = ["/", "/index.html", "/manifest.json", "/icon-192.png", "/icon-512.png", "/rachometro-logo.png", "/splash-soccer.gif"];
       caches
-        .open("rachometro-runtime-v11")
+        .open("rachometro-runtime-v12")
         .then(cache => cache.addAll([...new Set([...coreUrls, ...sameOriginResources])]))
         .catch(() => {});
     };
@@ -484,12 +494,35 @@ function App() {
   return (
     <>
       <div className={`toast ${toast ? "show" : ""}`}>{toast}</div>
+      {showSplash && <SplashScreen onSkip={() => {
+        sessionStorage.setItem("splashSeen", "true");
+        setShowSplash(false);
+      }} />}
       {route === "placar" ? (
         <ScorePage logoUrl={logoUrl} goTo={goTo} showToast={showToast} />
       ) : (
         <DrawPage logoUrl={logoUrl} goTo={goTo} showToast={showToast} />
       )}
     </>
+  );
+}
+
+function SplashScreen({ onSkip }) {
+  return (
+    <div className="splash-screen" role="status" aria-live="polite" onClick={onSkip}>
+      <div className="splash-content">
+        <div className="splash-logo-wrap">
+          <img className="splash-animation" src="/splash-soccer.gif" alt="" />
+        </div>
+        <div>
+          <span className="app-kicker">{APP_NAME}</span>
+          <h1>RachôMetro</h1>
+        </div>
+        <div className="splash-loader">
+          <span />
+        </div>
+      </div>
+    </div>
   );
 }
 

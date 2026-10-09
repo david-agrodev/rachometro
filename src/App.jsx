@@ -327,7 +327,7 @@ function App() {
 
       const coreUrls = ["/", "/index.html", "/manifest.json", "/icon-192.png", "/icon-512.png", "/rachometro-logo.png"];
       caches
-        .open("rachometro-runtime-v10")
+        .open("rachometro-runtime-v11")
         .then(cache => cache.addAll([...new Set([...coreUrls, ...sameOriginResources])]))
         .catch(() => {});
     };
@@ -405,6 +405,7 @@ function DrawPage({ logoUrl, goTo, showToast }) {
   const valorQuadraNumero = Number(String(valorQuadra).replace(",", ".")) || 0;
   const valorPorJogador = jogadores.length ? valorQuadraNumero / jogadores.length : 0;
   const totalPago = jogadores.filter(nome => pagamentos[normalizarNomeJogador(nome)]).length;
+  const totalRecebido = totalPago * valorPorJogador;
 
   const previewLista = useMemo(() => {
     const linhas = [];
@@ -593,12 +594,17 @@ function DrawPage({ logoUrl, goTo, showToast }) {
   }
 
   function montarTextoWhatsApp(timesMontados, modalidadeAtual, avisosRestricao, craquesMarcados = craquesAplicados, atrasadosMarcados = atrasadosAplicados) {
-    const modalidadeLabel = MODALIDADES.find(item => item.value === modalidadeAtual)?.label || modalidadeAtual.toUpperCase();
-    const totalJogadores = timesMontados.reduce((total, time) => total + time.length, 0);
+    const dataSorteio = new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(new Date());
     let texto = `🏆 *RachôMetro - Sorteio dos Times*\n`;
-    texto += `⚽ *Modalidade:* ${modalidadeLabel}\n`;
-    texto += `👥 *Por time:* ${jogadoresPorTime} jogadores\n`;
-    texto += `🎲 *Total:* ${totalJogadores} jogadores em ${timesMontados.length} times\n`;
+    texto += `🕒 Sorteio realizado: ${dataSorteio}\n`;
+    if (valorQuadraNumero > 0) {
+      texto += `💰 Valor da quadra: ${formatarMoeda(valorQuadraNumero)}\n`;
+    }
     texto += `━━━━━━━━━━━━━━\n\n`;
 
     timesMontados.forEach((time, index) => {
@@ -735,6 +741,8 @@ function DrawPage({ logoUrl, goTo, showToast }) {
     texto += `🏟️ Valor: *${formatarMoeda(valorQuadraNumero)}*\n`;
     texto += `👥 Pagantes: *${jogadores.length} atletas de linha*\n`;
     texto += `🧮 Cada um: *${formatarMoeda(valorPorJogador)}*\n\n`;
+    texto += `✅ Recebido até agora: *${formatarMoeda(totalRecebido)}*\n`;
+    texto += `⏳ Falta receber: *${formatarMoeda(Math.max(0, valorQuadraNumero - totalRecebido))}*\n\n`;
     texto += `✅ *Pagos (${pagos.length})*\n${pagos.length ? pagos.map(nome => `• ${nome}`).join("\n") : "Ninguém ainda."}\n\n`;
     texto += `⏳ *Falta pagar (${pendentes.length})*\n${pendentes.length ? pendentes.map(nome => `• ${nome}`).join("\n") : "Todo mundo pagou."}`;
     copiarTexto(texto, "Rateio copiado.");
@@ -1007,6 +1015,7 @@ function DrawPage({ logoUrl, goTo, showToast }) {
               <div className="payment-summary">
                 <span>{jogadores.length} atletas</span>
                 <strong>{formatarMoeda(valorPorJogador)} cada</strong>
+                <span>Recebido: {formatarMoeda(totalRecebido)}</span>
                 <span>{totalPago}/{jogadores.length} pagos</span>
               </div>
               <div className="payment-list">
@@ -1523,7 +1532,7 @@ function ScorePage({ logoUrl, goTo, showToast }) {
   }
 
   function ajustarDraftTimer(delta) {
-    setDraftTimerMinutes(prev => Math.max(1, Math.min(99, Number(prev || 1) + delta)));
+    setDraftTimerMinutes(prev => String(Math.max(1, Math.min(99, (Number(prev) || 0) + delta))));
   }
 
   function aplicarTimerEdit() {
@@ -1673,7 +1682,14 @@ function ScorePage({ logoUrl, goTo, showToast }) {
                   min="1"
                   max="99"
                   value={draftTimerMinutes}
-                  onChange={event => setDraftTimerMinutes(Math.max(1, Math.min(99, Number(event.target.value) || 1)))}
+                  onChange={event => {
+                    const value = event.target.value;
+                    if (value === "") {
+                      setDraftTimerMinutes("");
+                      return;
+                    }
+                    setDraftTimerMinutes(String(Math.max(1, Math.min(99, Number(value) || 1))));
+                  }}
                   autoFocus
                 />
               </label>
@@ -1681,7 +1697,7 @@ function ScorePage({ logoUrl, goTo, showToast }) {
             </div>
             <div className="timer-presets">
               {[5, 7, 10, 15].map(minutes => (
-                <button className="btn-outline" type="button" key={minutes} onClick={() => setDraftTimerMinutes(minutes)}>
+                <button className="btn-outline" type="button" key={minutes} onClick={() => setDraftTimerMinutes(String(minutes))}>
                   {minutes} min
                 </button>
               ))}

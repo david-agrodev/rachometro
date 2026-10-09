@@ -1,0 +1,62 @@
+name: Gerar APK Android (teste)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Instalar dependencias web
+        run: npm ci
+
+      - name: Compilar React
+        run: npm run build
+
+      - name: Instalar Capacitor (temporariamente)
+        run: npm install --no-save @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7
+
+      - name: Criar configuracao Android
+        run: |
+          cat > capacitor.config.json <<'JSON'
+          {
+            "appId": "com.rachometro.app",
+            "appName": "RachôMetro",
+            "webDir": "dist"
+          }
+          JSON
+          npx cap add android
+          npx cap sync android
+
+      - name: Gerar APK de testes
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Disponibilizar APK para download
+        uses: actions/upload-artifact@v4
+        with:
+          name: rachometro-apk-teste
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7

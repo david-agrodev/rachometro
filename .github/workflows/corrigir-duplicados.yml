@@ -1,0 +1,82 @@
+name: Corrigir nomes duplicados
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  corrigir:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o projeto
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Criar branch segura
+        run: |
+          git checkout -b fix/nomes-duplicados
+
+      - name: Aplicar correcoes no React
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          arquivo = Path('src/App.jsx')
+          s = arquivo.read_text(encoding='utf-8')
+          def trocar(antigo, novo):
+              global s
+              if s.count(antigo) != 1:
+                  raise RuntimeError(f'Esperada exatamente uma ocorrencia; encontradas {s.count(antigo)}: {antigo[:90]}')
+              s = s.replace(antigo, novo, 1)
+
+          helper = '''function identificarNomesDuplicados(nomes) {
+            const vistos = new Set();
+            const repetidos = new Set();
+            for (const nome of nomes) {
+              const chave = normalizarNomeJogador(nome).replace(/\\s+/g, " ");
+              if (!chave) continue;
+              if (vistos.has(chave)) repetidos.add(nome.trim());
+              else vistos.add(chave);
+            }
+            return [...repetidos];
+          }
+
+          function avisarNomesDuplicados(nomes) {
+            const duplicados = identificarNomesDuplicados(nomes);
+            if (!duplicados.length) return false;
+            window.alert(
+              "Existem jogadores com nomes iguais!\\n\\n" +
+              "Diferencie os nomes antes de continuar:\\n\\n" +
+              duplicados.join("\\n") +
+              "\\n\\nExemplo: Gabriel Silva e Gabriel Souza."
+            );
+            return true;
+          }
+
+          '''
+          trocar('function embaralhar(array) {', helper + 'function embaralhar(array) {')
+          trocar('    setGoleiros(novosGoleiros);',
+                 '    if (avisarNomesDuplicados([...novosGoleiros, ...novosJogadores])) return;\n\n    setGoleiros(novosGoleiros);')
+          # Substituicao exata sem depender de recuo da string multilinha:
+          trocar('    if (!nome) {\n      showToast("Digite um nome para adicionar.");\n      return;\n    }\n',
+                 '    if (!nome) {\n      showToast("Digite um nome para adicionar.");\n      return;\n    }\n\n    if (avisarNomesDuplicados([...goleiros, ...jogadores, nome])) return;\n')
+          trocar('    if (sorteando) return;\n    const gruposRestritos',
+                 '    if (sorteando) return;\n    if (avisarNomesDuplicados([...goleiros, ...jogadores])) return;\n    const gruposRestritos')
+          arquivo.write_text(s, encoding='utf-8')
+          print('Correcoes aplicadas em src/App.jsx')
+          PY
+
+      - name: Verificar compilacao
+        run: |
+          npm ci
+          npm run build
+
+      - name: Salvar alteracoes na branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.jsx
+          git commit -m "fix: bloquear nomes duplicados na lista e no sorteio"
+          git push origin fix/nomes-duplicados
